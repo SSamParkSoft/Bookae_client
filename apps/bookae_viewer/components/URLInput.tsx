@@ -90,8 +90,8 @@ export default function URLInput({ onExtract }: URLInputProps) {
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="https://www.youtube.com/watch?v=nKpZFe-fx2Q 또는 https://example.com?videoID=123"
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="url을 입력해주세요."
+            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 text-gray-600"
           />
           <button
             onClick={handleExtract}
