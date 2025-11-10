@@ -1,8 +1,79 @@
-[00:00:00.519] Server  LOG     
-[00:00:00.519] Server  LOG        We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
-[00:00:00.519] Server  LOG        The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
-
-[00:00:00.519] Server  LOG        	- include was updated to add '.next/dev/types/**/*.ts'
-[00:00:00.520] Server  LOG     
-[00:00:00.580] Server  LOG      ✓ Ready in 469ms
-[00:00:06.314] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:00.719] Server  LOG      ✓ Ready in 559ms
+[00:03:59.742] Server  LOG      ✓ Compiled in 48ms
+[00:03:59.824] Browser LOG     Current URL videoID: null
+[00:03:59.824] Browser LOG     Referer: 
+[00:03:59.824] Browser LOG     Referer videoID: null
+[00:03:59.824] Browser LOG     Final videoID: null
+[00:04:24.824] Server  LOG      ✓ Compiled in 52ms
+[00:04:24.900] Browser LOG     Current URL videoID: null
+[00:04:24.900] Browser LOG     Referer: 
+[00:04:24.900] Browser LOG     Referer videoID: null
+[00:04:24.900] Browser LOG     Final videoID: null
+[00:04:24.900] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL videoID: null
+[00:04:24.900] Browser LOG     [2;38;2;124;124;124m%s[0m Referer: 
+[00:04:24.900] Browser LOG     [2;38;2;124;124;124m%s[0m Referer videoID: null
+[00:04:24.900] Browser LOG     [2;38;2;124;124;124m%s[0m Final videoID: null
+[00:06:18.082] Server  LOG      ✓ Compiled in 49ms
+[00:06:18.437] Browser LOG     Current URL videoID: null
+[00:06:18.437] Browser LOG     Referer: 
+[00:06:18.437] Browser LOG     Referer videoID: null
+[00:06:18.437] Browser LOG     Final videoID: null
+[00:06:18.437] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL videoID: null
+[00:06:18.437] Browser LOG     [2;38;2;124;124;124m%s[0m Referer: 
+[00:06:18.437] Browser LOG     [2;38;2;124;124;124m%s[0m Referer videoID: null
+[00:06:18.437] Browser LOG     [2;38;2;124;124;124m%s[0m Final videoID: null
+[00:06:23.850] Server  LOG      ✓ Compiled in 40ms
+[00:06:24.436] Browser LOG     Current URL: http://localhost:3001/#
+[00:06:24.436] Browser LOG     Current URL videoID: null
+[00:06:24.436] Browser LOG     Referer: 
+[00:06:24.436] Browser LOG     Referer videoID: null
+[00:06:24.436] Browser LOG     Final videoID: null
+[00:06:24.436] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL: http://localhost:3001/#
+[00:06:24.436] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL videoID: null
+[00:06:24.436] Browser LOG     [2;38;2;124;124;124m%s[0m Referer: 
+[00:06:24.436] Browser LOG     [2;38;2;124;124;124m%s[0m Referer videoID: null
+[00:06:24.436] Browser LOG     [2;38;2;124;124;124m%s[0m Final videoID: null
+[00:06:40.427] Server  LOG     Current URL: null
+[00:06:40.427] Server  LOG     Current URL videoID: null
+[00:06:40.427] Server  LOG     Referer: null
+[00:06:40.427] Server  LOG     Referer videoID: null
+[00:06:40.427] Server  LOG     Final videoID: null
+[00:06:40.829] Browser LOG     Current URL: http://localhost:3001/#
+[00:06:40.829] Browser LOG     Current URL videoID: null
+[00:06:40.829] Browser LOG     Referer: 
+[00:06:40.829] Browser LOG     Referer videoID: null
+[00:06:40.829] Browser LOG     Final videoID: null
+[00:06:40.829] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL: http://localhost:3001/#
+[00:06:40.829] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL videoID: null
+[00:06:40.829] Browser LOG     [2;38;2;124;124;124m%s[0m Referer: 
+[00:06:40.829] Browser LOG     [2;38;2;124;124;124m%s[0m Referer videoID: null
+[00:06:40.829] Browser LOG     [2;38;2;124;124;124m%s[0m Final videoID: null
+[00:07:51.321] Server  LOG      ✓ Compiled in 21ms
+[00:07:51.401] Browser LOG     Current URL: http://localhost:3001/
+[00:07:51.402] Browser LOG     Current URL videoID: null
+[00:07:51.402] Browser LOG     Referer: 
+[00:07:51.402] Browser LOG     Referer videoID: null
+[00:07:51.402] Browser LOG     Final videoID: null
+[00:07:51.402] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL: http://localhost:3001/
+[00:07:51.402] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL videoID: null
+[00:07:51.402] Browser LOG     [2;38;2;124;124;124m%s[0m Referer: 
+[00:07:51.402] Browser LOG     [2;38;2;124;124;124m%s[0m Referer videoID: null
+[00:07:51.402] Browser LOG     [2;38;2;124;124;124m%s[0m Final videoID: null
+[00:08:03.228] Server  LOG      ✓ Compiled in 44ms
+[00:08:03.307] Browser LOG     Current URL: http://localhost:3001/
+[00:08:03.307] Browser LOG     Referer: 
+[00:08:03.307] Browser LOG     Extracted videoID: null
+[00:08:03.307] Browser LOG     Source: null
+[00:08:03.307] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL: http://localhost:3001/
+[00:08:03.307] Browser LOG     [2;38;2;124;124;124m%s[0m Referer: 
+[00:08:03.307] Browser LOG     [2;38;2;124;124;124m%s[0m Extracted videoID: null
+[00:08:03.307] Browser LOG     [2;38;2;124;124;124m%s[0m Source: null
+[00:08:05.565] Server  LOG      ✓ Compiled in 66ms
+[00:08:05.643] Browser LOG     Current URL: http://localhost:3001/
+[00:08:05.643] Browser LOG     Referer: 
+[00:08:05.643] Browser LOG     Extracted videoID: null
+[00:08:05.643] Browser LOG     Source: null
+[00:08:05.643] Browser LOG     [2;38;2;124;124;124m%s[0m Current URL: http://localhost:3001/
+[00:08:05.643] Browser LOG     [2;38;2;124;124;124m%s[0m Referer: 
+[00:08:05.643] Browser LOG     [2;38;2;124;124;124m%s[0m Extracted videoID: null
+[00:08:05.643] Browser LOG     [2;38;2;124;124;124m%s[0m Source: null
