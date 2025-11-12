@@ -20,11 +20,11 @@ export default function HomePage() {
             placeholder="https://www.coupang.com/vp/products/..."
             value={productUrl}
             onChange={(e) => setProductUrl(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
           {productUrl && (
             <p className="mt-3 text-sm text-gray-500">
-              입력된 링크: <span className="text-blue-600">{productUrl}</span>
+              입력된 링크: <span className="text-purple-600">{productUrl}</span>
             </p>
           )}
         </div>

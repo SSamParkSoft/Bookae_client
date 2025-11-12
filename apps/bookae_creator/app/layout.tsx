@@ -1,6 +1,8 @@
 import './globals.css'
 import Providers from './providers'
 import Sidebar from '../components/Sidebar'
+import ThemeToggle from '../components/ThemeToggle'
+import ThemeInitializer from '../components/ThemeInitializer'
 
 export const metadata = {
   title: 'Bookae Client',
@@ -10,7 +12,8 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-gray-50 text-gray-900">
+      <body className="transition-colors">
+        <ThemeInitializer />
         <Providers>
           <div className="flex min-h-screen">
             <Sidebar />
@@ -18,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
             </main>
           </div>
+          <ThemeToggle />
         </Providers>
       </body>
     </html>
