@@ -44,10 +44,11 @@ export default function Step4Page() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <StepIndicator />
-      <div className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-4xl mx-auto">
+    <div className="flex min-h-screen justify-center">
+      <div className="flex">
+        <StepIndicator />
+        <div className="p-8 overflow-y-auto">
+          <div className="w-[918px]">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
               <CheckCircle className="w-8 h-8 text-green-500" />
@@ -195,6 +196,7 @@ export default function Step4Page() {
               💡 모든 파일을 다운로드한 후, 유튜브에 영상을 업로드하세요. 자동 업로드 기능은
               추후 제공될 예정입니다.
             </p>
+          </div>
           </div>
         </div>
       </div>

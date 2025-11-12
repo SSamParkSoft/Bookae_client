@@ -56,10 +56,12 @@ export default function Step2Page() {
   const currentStepData = creationSteps.find((s) => s.id === currentStep)
 
   return (
-    <div className="flex min-h-screen">
-      <StepIndicator />
-      <div className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-2xl mx-auto flex flex-col items-center justify-center min-h-full">
+    <div className="flex min-h-screen justify-center">
+      <div className="flex">
+        <StepIndicator />
+        <div className="p-8 overflow-y-auto">
+          <div className="w-[918px]">
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)]">
           <div className={`text-center mb-8 ${
             theme === 'dark' ? 'text-white' : 'text-gray-900'
           }`}>
@@ -155,6 +157,8 @@ export default function Step2Page() {
                   width: `${((currentStep - 1) / creationSteps.length) * 100}%`,
                 }}
               />
+            </div>
+          </div>
             </div>
           </div>
         </div>

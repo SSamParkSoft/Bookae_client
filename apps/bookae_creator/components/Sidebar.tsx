@@ -36,7 +36,10 @@ export default function Sidebar() {
       
       <nav className="flex-1 p-4 space-y-2">
         {navigation.map((item) => {
-          const isActive = pathname === item.href
+          // 정확히 일치하거나 하위 경로인지 확인 (단, 루트 경로는 정확히 일치해야 함)
+          const isActive = item.href === '/'
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(`${item.href}/`)
           const Icon = item.icon
           
           return (

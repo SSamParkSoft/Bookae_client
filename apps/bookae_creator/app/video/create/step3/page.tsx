@@ -72,10 +72,11 @@ export default function Step3Page() {
 
   if (selectedProducts.length === 0) {
     return (
-      <div className="flex min-h-screen">
-        <StepIndicator />
-        <div className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-4xl mx-auto">
+      <div className="flex min-h-screen justify-center">
+        <div className="flex">
+          <StepIndicator />
+          <div className="p-8 overflow-y-auto">
+            <div className="w-[918px]">
             <div className={`text-center py-12 ${
               theme === 'dark' ? 'text-white' : 'text-gray-900'
             }`}>
@@ -87,6 +88,7 @@ export default function Step3Page() {
                 상품 선택하러 가기
               </button>
             </div>
+            </div>
           </div>
         </div>
       </div>
@@ -94,10 +96,11 @@ export default function Step3Page() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <StepIndicator />
-      <div className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-4xl mx-auto">
+    <div className="flex min-h-screen justify-center">
+      <div className="flex">
+        <StepIndicator />
+        <div className="p-8 overflow-y-auto">
+          <div className="w-[918px]">
           <h1 className={`text-3xl font-bold mb-2 ${
             theme === 'dark' ? 'text-white' : 'text-gray-900'
           }`}>
@@ -249,6 +252,7 @@ export default function Step3Page() {
               <Play className="w-5 h-5" />
               <span>영상 제작하기</span>
             </button>
+          </div>
           </div>
         </div>
       </div>

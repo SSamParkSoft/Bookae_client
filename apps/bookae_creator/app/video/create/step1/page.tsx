@@ -238,11 +238,11 @@ export default function Step1Page() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen justify-center">
       <div className="flex">
         <StepIndicator />
-        <div className="flex-1 p-8">
-          <div className="max-w-5xl">
+        <div className="p-8 overflow-y-auto">
+          <div className="w-[918px]">
           <h1 className={`text-3xl font-bold mb-2 ${
             theme === 'dark' ? 'text-white' : 'text-gray-900'
           }`}>
