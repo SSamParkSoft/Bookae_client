@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, Loader2, CheckCircle } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useVideoCreateStore } from '../../../../store/useVideoCreateStore'
 import { useThemeStore } from '../../../../store/useThemeStore'
 import StepIndicator from '../../../../components/StepIndicator'
@@ -56,7 +57,13 @@ export default function Step2Page() {
   const currentStepData = creationSteps.find((s) => s.id === currentStep)
 
   return (
-    <div className="flex min-h-screen justify-center">
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="flex min-h-screen justify-center"
+    >
       <div className="flex">
         <StepIndicator />
         <div className="p-8 overflow-y-auto">
@@ -163,7 +170,7 @@ export default function Step2Page() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

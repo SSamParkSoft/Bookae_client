@@ -101,7 +101,7 @@ export default function SelectedProductsPanel() {
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg flex-shrink-0" />
+                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg " />
                   <div className="flex-1 min-w-0">
                     <h3 className={`font-semibold text-sm mb-1 line-clamp-2 ${
                       theme === 'dark' ? 'text-white' : 'text-gray-900'

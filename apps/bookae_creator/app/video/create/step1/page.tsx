@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { TrendingUp, ArrowRight, Search, ShoppingCart, Loader2 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useVideoCreateStore, Product, Platform } from '../../../../store/useVideoCreateStore'
 import { useThemeStore } from '../../../../store/useThemeStore'
 import StepIndicator from '../../../../components/StepIndicator'
@@ -238,7 +239,13 @@ export default function Step1Page() {
   }
 
   return (
-    <div className="flex min-h-screen justify-center">
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="flex min-h-screen justify-center"
+    >
       <div className="flex">
         <StepIndicator />
         <div className="p-8 overflow-y-auto">
@@ -461,7 +468,7 @@ export default function Step1Page() {
       <div className="p-8">
         <SelectedProductsPanel />
       </div>
-    </div>
+    </motion.div>
   )
 }
 

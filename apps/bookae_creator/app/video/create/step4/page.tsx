@@ -1,6 +1,7 @@
 'use client'
 
 import { Download, Image, Video, FileText, CheckCircle } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useThemeStore } from '../../../../store/useThemeStore'
 import { useVideoCreateStore } from '../../../../store/useVideoCreateStore'
 import StepIndicator from '../../../../components/StepIndicator'
@@ -44,7 +45,13 @@ export default function Step4Page() {
   }
 
   return (
-    <div className="flex min-h-screen justify-center">
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="flex min-h-screen justify-center"
+    >
       <div className="flex">
         <StepIndicator />
         <div className="p-8 overflow-y-auto">
@@ -200,7 +207,7 @@ export default function Step4Page() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

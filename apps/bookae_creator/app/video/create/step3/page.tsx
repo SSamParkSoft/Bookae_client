@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Play, X } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useVideoCreateStore } from '../../../../store/useVideoCreateStore'
 import { useThemeStore } from '../../../../store/useThemeStore'
 import StepIndicator from '../../../../components/StepIndicator'
@@ -72,7 +73,13 @@ export default function Step3Page() {
 
   if (selectedProducts.length === 0) {
     return (
-      <div className="flex min-h-screen justify-center">
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        transition={{ duration: 0.3 }}
+        className="flex min-h-screen justify-center"
+      >
         <div className="flex">
           <StepIndicator />
           <div className="p-8 overflow-y-auto">
@@ -91,12 +98,18 @@ export default function Step3Page() {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     )
   }
 
   return (
-    <div className="flex min-h-screen justify-center">
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="flex min-h-screen justify-center"
+    >
       <div className="flex">
         <StepIndicator />
         <div className="p-8 overflow-y-auto">
@@ -256,7 +269,7 @@ export default function Step3Page() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
