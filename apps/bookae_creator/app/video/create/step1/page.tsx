@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, ArrowRight, Search, ShoppingCart } from 'lucide-react'
+import { TrendingUp, ArrowRight, Search, ShoppingCart, Loader2 } from 'lucide-react'
 import { useVideoCreateStore, Product, Platform } from '../../../../store/useVideoCreateStore'
 import { useThemeStore } from '../../../../store/useThemeStore'
 import StepIndicator from '../../../../components/StepIndicator'
@@ -17,97 +17,106 @@ const popularProducts = [
   { id: 'pop5', name: '무선 마우스', views: 6500, rank: 5 },
 ]
 
-// 더미 데이터
+// 더미 데이터 생성 함수
+const generateProducts = (platform: Platform, count: number): Product[] => {
+  const productTemplates: Record<Platform, { names: string[]; descriptions: string[]; priceRange: [number, number] }> = {
+    coupang: {
+      names: [
+        '무선 이어폰 블루투스 5.0', '스마트워치 피트니스 트래커', 'USB-C 충전 케이블',
+        '노트북 쿨링 패드', '무선 충전기', '블루투스 스피커', '스마트폰 거치대',
+        'USB 허브', '케이블 정리함', '노트북 가방', '마우스 패드', '키보드',
+        '웹캠', '마이크', '헤드셋', '모니터 스탠드', '책상 정리함', '의자 쿠션',
+        'LED 데스크 램프', 'USB 메모리'
+      ],
+      descriptions: [
+        '고음질 무선 이어폰', '건강 관리 스마트워치', '고속 충전 케이블',
+        '노트북 발열 방지', '무선 충전 지원', '고품질 사운드', '각도 조절 가능',
+        '다중 포트 지원', '케이블 정리 용이', '보호 기능 우수', '부드러운 마우스 움직임',
+        '기계식 키보드', '고화질 영상', '선명한 음성', '편안한 착용감', '모니터 높이 조절',
+        '책상 정리 도우미', '등받이 쿠션', '눈 피로 감소', '빠른 전송 속도'
+      ],
+      priceRange: [5000, 100000]
+    },
+    naver: {
+      names: [
+        '에어컨 필터 세트', '무선 마우스', '공기청정기 필터', '청소기 필터',
+        '세탁기 세제', '다이어트 보조제', '비타민', '건강식품', '화장품 세트',
+        '스킨케어', '선크림', '마스크팩', '샴푸', '바디워시', '핸드크림',
+        '립밤', '에센스', '크림', '토너', '클렌징폼'
+      ],
+      descriptions: [
+        '에어컨 청정 필터', '인체공학 무선 마우스', '미세먼지 제거', '먼지 제거 효율 우수',
+        '강력한 세정력', '체중 관리', '영양 보충', '건강 유지', '완벽한 메이크업',
+        '피부 관리', '자외선 차단', '수분 공급', '모발 관리', '부드러운 세정',
+        '손 보호', '입술 보호', '피부 진정', '수분 공급', '피부 정화', '깨끗한 세정'
+      ],
+      priceRange: [5000, 50000]
+    },
+    aliexpress: {
+      names: [
+        'LED 스트립 라이트', '스마트폰 케이스', '보호 필름', '충전 케이블',
+        '어댑터', '거치대', '카메라 렌즈', '셀카봉', '삼각대', '조명',
+        '장식품', '액세서리', '가방', '지갑', '벨트', '시계',
+        '반지', '목걸이', '귀걸이', '팔찌'
+      ],
+      descriptions: [
+        'RGB LED 조명', '방수 보호 케이스', '스크래치 방지', '빠른 충전',
+        '다양한 기기 지원', '안정적인 거치', '고화질 촬영', '자유로운 각도',
+        '안정적인 촬영', '밝은 조명', '인테리어 소품', '스타일리시한 디자인',
+        '실용적인 수납', '컴팩트한 디자인', '편안한 착용', '정확한 시간',
+        '우아한 디자인', '세련된 스타일', '고급스러운 느낌', '데일리 착용'
+      ],
+      priceRange: [3000, 30000]
+    },
+    amazon: {
+      names: [
+        'Bluetooth Speaker', 'Laptop Stand', 'Wireless Mouse', 'Keyboard',
+        'Monitor', 'Webcam', 'Microphone', 'Headphones', 'USB Hub', 'Cable',
+        'Adapter', 'Charger', 'Power Bank', 'Tablet Stand', 'Phone Mount',
+        'Desk Organizer', 'Cable Management', 'Laptop Sleeve', 'Backpack', 'Stand'
+      ],
+      descriptions: [
+        'Portable wireless speaker', 'Ergonomic laptop stand', 'Precise tracking',
+        'Mechanical keys', 'Crystal clear display', 'HD video quality', 'Studio quality',
+        'Noise cancelling', 'Multiple ports', 'Fast charging', 'Universal compatibility',
+        'Quick charge', 'High capacity', 'Adjustable angle', 'Secure mount',
+        'Desk organization', 'Cable tidy', 'Laptop protection', 'Comfortable carry',
+        'Stable support'
+      ],
+      priceRange: [10000, 200000]
+    }
+  }
+
+  const template = productTemplates[platform]
+  const products: Product[] = []
+
+  for (let i = 1; i <= count; i++) {
+    const nameIndex = (i - 1) % template.names.length
+    const descIndex = (i - 1) % template.descriptions.length
+    const price = Math.floor(
+      Math.random() * (template.priceRange[1] - template.priceRange[0]) + template.priceRange[0]
+    )
+    
+    products.push({
+      id: `${platform}${i}`,
+      name: `${template.names[nameIndex]} ${i > template.names.length ? `(${Math.floor(i / template.names.length) + 1})` : ''}`,
+      price: Math.floor(price / 100) * 100, // 100원 단위로 반올림
+      image: 'https://via.placeholder.com/200',
+      platform,
+      url: `https://${platform === 'coupang' ? 'www.coupang.com/vp/products' : platform === 'naver' ? 'shopping.naver.com/products' : platform === 'aliexpress' ? 'www.aliexpress.com/item' : 'www.amazon.com/dp'}/${platform}${i}`,
+      description: template.descriptions[descIndex],
+    })
+  }
+
+  return products
+}
+
+// 각 플랫폼별로 20개씩 생성
 const dummyProducts: Record<Platform, Product[]> = {
-  coupang: [
-    {
-      id: 'c1',
-      name: '무선 이어폰 블루투스 5.0',
-      price: 29900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'coupang',
-      url: 'https://www.coupang.com/vp/products/c1',
-      description: '고음질 무선 이어폰',
-    },
-    {
-      id: 'c2',
-      name: '스마트워치 피트니스 트래커',
-      price: 49900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'coupang',
-      url: 'https://www.coupang.com/vp/products/c2',
-      description: '건강 관리 스마트워치',
-    },
-    {
-      id: 'c3',
-      name: 'USB-C 충전 케이블',
-      price: 8900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'coupang',
-      url: 'https://www.coupang.com/vp/products/c3',
-      description: '고속 충전 케이블',
-    },
-  ],
-  naver: [
-    {
-      id: 'n1',
-      name: '에어컨 필터 세트',
-      price: 15900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'naver',
-      url: 'https://shopping.naver.com/products/n1',
-      description: '에어컨 청정 필터',
-    },
-    {
-      id: 'n2',
-      name: '무선 마우스',
-      price: 19900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'naver',
-      url: 'https://shopping.naver.com/products/n2',
-      description: '인체공학 무선 마우스',
-    },
-  ],
-  aliexpress: [
-    {
-      id: 'a1',
-      name: 'LED 스트립 라이트',
-      price: 12900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'aliexpress',
-      url: 'https://www.aliexpress.com/item/a1',
-      description: 'RGB LED 조명',
-    },
-    {
-      id: 'a2',
-      name: '스마트폰 케이스',
-      price: 5900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'aliexpress',
-      url: 'https://www.aliexpress.com/item/a2',
-      description: '방수 보호 케이스',
-    },
-  ],
-  amazon: [
-    {
-      id: 'am1',
-      name: 'Bluetooth Speaker',
-      price: 39900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'amazon',
-      url: 'https://www.amazon.com/dp/am1',
-      description: 'Portable wireless speaker',
-    },
-    {
-      id: 'am2',
-      name: 'Laptop Stand',
-      price: 29900,
-      image: 'https://via.placeholder.com/200',
-      platform: 'amazon',
-      url: 'https://www.amazon.com/dp/am2',
-      description: 'Ergonomic laptop stand',
-    },
-  ],
+  coupang: generateProducts('coupang', 20),
+  naver: generateProducts('naver', 20),
+  aliexpress: generateProducts('aliexpress', 20),
+  amazon: generateProducts('amazon', 20),
 }
 
 const platformNames: Record<Platform, string> = {
@@ -123,6 +132,9 @@ export default function Step1Page() {
   const theme = useThemeStore((state) => state.theme)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'all'>('all')
+  const [displayCount, setDisplayCount] = useState(16) // 초기 표시 개수
+  const [isLoading, setIsLoading] = useState(false)
+  const observerTarget = useRef<HTMLDivElement>(null)
 
   const handleDragStart = (e: React.DragEvent, product: Product) => {
     e.dataTransfer.setData('application/json', JSON.stringify(product))
@@ -130,11 +142,39 @@ export default function Step1Page() {
     e.dataTransfer.dropEffect = 'move'
   }
 
-  const filteredProducts = () => {
+  // 플랫폼별로 골고루 섞기
+  const shuffleProducts = (products: Product[]): Product[] => {
+    const platformGroups: Record<Platform, Product[]> = {
+      coupang: [],
+      naver: [],
+      aliexpress: [],
+      amazon: [],
+    }
+
+    products.forEach((product) => {
+      platformGroups[product.platform].push(product)
+    })
+
+    const shuffled: Product[] = []
+    const maxLength = Math.max(...Object.values(platformGroups).map((arr) => arr.length))
+
+    for (let i = 0; i < maxLength; i++) {
+      Object.values(platformGroups).forEach((group) => {
+        if (group[i]) {
+          shuffled.push(group[i])
+        }
+      })
+    }
+
+    return shuffled
+  }
+
+  const filteredProducts = useMemo(() => {
     let products: Product[] = []
     
     if (selectedPlatform === 'all') {
-      products = Object.values(dummyProducts).flat()
+      // 전체 선택 시 플랫폼별로 골고루 섞기
+      products = shuffleProducts(Object.values(dummyProducts).flat())
     } else {
       products = dummyProducts[selectedPlatform]
     }
@@ -149,7 +189,43 @@ export default function Step1Page() {
     }
 
     return products
-  }
+  }, [selectedPlatform, searchQuery])
+
+  const displayedProducts = useMemo(() => {
+    return filteredProducts.slice(0, displayCount)
+  }, [filteredProducts, displayCount])
+
+  // 무한 스크롤
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isLoading && displayCount < filteredProducts.length) {
+          setIsLoading(true)
+          // 로딩 시뮬레이션
+          setTimeout(() => {
+            setDisplayCount((prev) => Math.min(prev + 16, filteredProducts.length))
+            setIsLoading(false)
+          }, 300)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current)
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current)
+      }
+    }
+  }, [displayCount, filteredProducts.length, isLoading])
+
+  // 검색어나 플랫폼 변경 시 displayCount 리셋
+  useEffect(() => {
+    setDisplayCount(16)
+  }, [searchQuery, selectedPlatform])
 
   const isProductSelected = (productId: string) => {
     return selectedProducts.some((p) => p.id === productId)
@@ -290,10 +366,10 @@ export default function Step1Page() {
             <h2 className={`text-lg font-semibold mb-4 ${
               theme === 'dark' ? 'text-white' : 'text-gray-900'
             }`}>
-              상품 목록
+              상품 목록 ({filteredProducts.length}개)
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts().map((product) => {
+              {displayedProducts.map((product) => {
                 const isSelected = isProductSelected(product.id)
                 return (
                   <div
@@ -341,6 +417,27 @@ export default function Step1Page() {
                 )
               })}
             </div>
+            {/* 무한 스크롤 트리거 */}
+            {displayCount < filteredProducts.length && (
+              <div ref={observerTarget} className="flex justify-center py-8">
+                {isLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                ) : (
+                  <div className={`text-sm ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    더 많은 상품 로딩 중...
+                  </div>
+                )}
+              </div>
+            )}
+            {displayCount >= filteredProducts.length && filteredProducts.length > 0 && (
+              <div className={`text-center py-4 text-sm ${
+                theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                모든 상품을 불러왔습니다
+              </div>
+            )}
           </div>
 
           {/* 다음 단계 버튼 */}
