@@ -1,12 +1,13 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useCoupangStats } from '@/lib/hooks/useCoupangStats'
 import { useYouTubeVideos } from '@/lib/hooks/useYouTubeVideos'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useThemeStore } from '@/store/useThemeStore'
-import { TrendingUp, ShoppingCart, Eye, Loader2, Youtube } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Eye, Loader2, Youtube, Users, Store } from 'lucide-react'
 
 const formatNumber = (num: number): string => {
   if (num >= 1000000) {
@@ -29,6 +30,7 @@ export default function HomePage() {
   const { data: coupangData, isLoading: coupangLoading } = useCoupangStats()
   const { data: youtubeVideos, isLoading: youtubeLoading } = useYouTubeVideos()
   const theme = useThemeStore((state) => state.theme)
+  const [isComingSoonOpen, setIsComingSoonOpen] = useState(false)
 
   // 금주의 핫 키워드 (카테고리별 주문 수 집계)
   const hotKeywords = useMemo(() => {
@@ -137,17 +139,29 @@ export default function HomePage() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.3, delay: index * 0.1 }}
-                        className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                          theme === 'dark' 
+                            ? 'border-purple-800/50 hover:bg-purple-900/20 hover:border-purple-700' 
+                            : 'border-purple-200 hover:bg-purple-50 hover:border-purple-300'
+                        }`}
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
                             index === 0
-                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              ? theme === 'dark'
+                                ? 'bg-purple-600 text-purple-100'
+                                : 'bg-purple-600 text-white'
                               : index === 1
-                              ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                              ? theme === 'dark'
+                                ? 'bg-purple-700/60 text-purple-200'
+                                : 'bg-purple-500 text-white'
                               : index === 2
-                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                              : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                              ? theme === 'dark'
+                                ? 'bg-purple-800/50 text-purple-300'
+                                : 'bg-purple-400 text-white'
+                              : theme === 'dark'
+                                ? 'bg-purple-900/40 text-purple-400'
+                                : 'bg-purple-100 text-purple-700'
                           }`}>
                             {index + 1}
                           </div>
@@ -194,18 +208,30 @@ export default function HomePage() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.3, delay: index * 0.1 }}
-                        className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className={`p-3 rounded-lg border transition-colors ${
+                          theme === 'dark' 
+                            ? 'border-purple-800/50 hover:bg-purple-900/20 hover:border-purple-700' 
+                            : 'border-purple-200 hover:bg-purple-50 hover:border-purple-300'
+                        }`}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-3 flex-1">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
                               index === 0
-                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                ? theme === 'dark'
+                                  ? 'bg-purple-600 text-purple-100'
+                                  : 'bg-purple-600 text-white'
                                 : index === 1
-                                ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                                ? theme === 'dark'
+                                  ? 'bg-purple-700/60 text-purple-200'
+                                  : 'bg-purple-500 text-white'
                                 : index === 2
-                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                ? theme === 'dark'
+                                  ? 'bg-purple-800/50 text-purple-300'
+                                  : 'bg-purple-400 text-white'
+                                : theme === 'dark'
+                                  ? 'bg-purple-900/40 text-purple-400'
+                                  : 'bg-purple-100 text-purple-700'
                             }`}>
                               {index + 1}
                             </div>
@@ -223,7 +249,9 @@ export default function HomePage() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div className={`flex items-center justify-between mt-2 pt-2 border-t ${
+                          theme === 'dark' ? 'border-purple-800/50' : 'border-purple-200'
+                        }`}>
                           <div>
                             <p className={`text-xs ${
                               theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
@@ -283,7 +311,9 @@ export default function HomePage() {
                         transition={{ duration: 0.3, delay: index * 0.1 }}
                         className="group cursor-pointer"
                       >
-                        <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 mb-2">
+                        <div className={`relative aspect-video rounded-lg overflow-hidden mb-2 ${
+                          theme === 'dark' ? 'bg-purple-900/30' : 'bg-purple-50'
+                        }`}>
                           {video.thumbnailUrl ? (
                             <img
                               src={video.thumbnailUrl}
@@ -292,18 +322,28 @@ export default function HomePage() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <Youtube className="w-12 h-12 text-gray-400" />
+                              <Youtube className={`w-12 h-12 ${
+                                theme === 'dark' ? 'text-purple-500' : 'text-purple-400'
+                              }`} />
                             </div>
                           )}
                           <div className="absolute top-2 left-2">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
                               index === 0
-                                ? 'bg-yellow-400 text-yellow-900'
+                                ? theme === 'dark'
+                                  ? 'bg-purple-600 text-purple-100'
+                                  : 'bg-purple-600 text-white'
                                 : index === 1
-                                ? 'bg-gray-300 text-gray-900'
+                                ? theme === 'dark'
+                                  ? 'bg-purple-700/80 text-purple-200'
+                                  : 'bg-purple-500 text-white'
                                 : index === 2
-                                ? 'bg-orange-400 text-orange-900'
-                                : 'bg-purple-400 text-purple-900'
+                                ? theme === 'dark'
+                                  ? 'bg-purple-800/70 text-purple-300'
+                                  : 'bg-purple-400 text-white'
+                                : theme === 'dark'
+                                  ? 'bg-purple-900/60 text-purple-400'
+                                  : 'bg-purple-300 text-purple-900'
                             }`}>
                               {index + 1}
                             </div>
@@ -311,7 +351,7 @@ export default function HomePage() {
                         </div>
                         <div className="flex items-center gap-2 mb-1">
                           <Eye className={`w-4 h-4 ${
-                            theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                            theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
                           }`} />
                           <span className={`text-sm font-semibold ${
                             theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
@@ -336,9 +376,100 @@ export default function HomePage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* 다른 회원들이 만든 상품 보러가기 */}
+            <Card 
+              className="lg:col-span-2 cursor-pointer transition-all hover:shadow-lg"
+              onClick={() => setIsComingSoonOpen(true)}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Store className={`w-5 h-5 ${
+                    theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                  }`} />
+                  <CardTitle>다른 회원들이 만든 상품 보러가기</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`p-8 rounded-lg border-2 border-dashed text-center ${
+                    theme === 'dark' 
+                      ? 'border-purple-800/50 bg-purple-900/10 hover:bg-purple-900/20 hover:border-purple-700' 
+                      : 'border-purple-200 bg-purple-50/50 hover:bg-purple-50 hover:border-purple-300'
+                  } transition-colors`}
+                >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                      theme === 'dark' 
+                        ? 'bg-purple-900/40' 
+                        : 'bg-purple-100'
+                    }`}>
+                      <Users className={`w-8 h-8 ${
+                        theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                      }`} />
+                    </div>
+                    <div>
+                      <p className={`text-lg font-semibold mb-2 ${
+                        theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
+                      }`}>
+                        다른 회원들의 상품을 둘러보세요
+                      </p>
+                      <p className={`text-sm ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        다양한 상품과 영상을 확인하고 영감을 얻어보세요
+                      </p>
+                    </div>
+                    <div className={`mt-2 px-4 py-2 rounded-lg inline-block ${
+                      theme === 'dark' 
+                        ? 'bg-purple-600 text-purple-100' 
+                        : 'bg-purple-600 text-white'
+                    }`}>
+                      <span className="text-sm font-medium">보러가기 →</span>
+                    </div>
+                  </div>
+                </motion.div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
+
+      {/* 준비중 다이얼로그 */}
+      <Dialog open={isComingSoonOpen} onOpenChange={setIsComingSoonOpen}>
+        <DialogContent className={`${
+          theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white'
+        }`}>
+          <DialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                theme === 'dark' 
+                  ? 'bg-purple-900/40' 
+                  : 'bg-purple-100'
+              }`}>
+                <Store className={`w-8 h-8 ${
+                  theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                }`} />
+              </div>
+            </div>
+            <DialogTitle className={`text-center text-2xl ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>
+              준비중입니다
+            </DialogTitle>
+            <DialogDescription className={`text-center mt-2 ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+            }`}>
+              다른 회원들이 만든 상품을 보는 기능은 현재 준비중입니다.
+              <br />
+              곧 만나볼 수 있도록 열심히 준비하고 있어요! 🚀
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }
