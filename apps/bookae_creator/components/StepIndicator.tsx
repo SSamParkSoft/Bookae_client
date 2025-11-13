@@ -2,7 +2,8 @@
 
 import { Check } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
-import classNames from 'classnames'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useThemeStore } from '../store/useThemeStore'
 
 const steps = [
@@ -50,58 +51,60 @@ export default function StepIndicator() {
           const isCompleted = currentStep > step.number
 
           return (
-            <button
-              key={step.number}
-              onClick={() => handleStepClick(step.path)}
-              className="w-full text-left"
-            >
-              <div className="flex items-center gap-4">
-                <div
-                  className={classNames(
-                    'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all',
-                    isActive
-                      ? theme === 'dark'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-purple-500 text-white'
-                      : isCompleted
-                        ? theme === 'dark'
-                          ? 'bg-purple-900/30 text-purple-300'
-                          : 'bg-purple-100 text-purple-700'
-                        : theme === 'dark'
-                          ? 'bg-gray-800 text-gray-400'
-                          : 'bg-gray-100 text-gray-400'
-                  )}
-                >
-                  {isCompleted ? (
-                    <Check className="w-5 h-5" />
-                  ) : (
-                    <span>{step.number}</span>
-                  )}
-                </div>
-                <div className="flex-1">
+            <div key={step.number} className="w-full">
+              <Button
+                variant="ghost"
+                onClick={() => handleStepClick(step.path)}
+                className="w-full justify-start p-0 h-auto"
+              >
+                <div className="flex items-center gap-4 w-full">
                   <div
-                    className={classNames(
-                      'text-sm font-medium',
+                    className={cn(
+                      'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all',
                       isActive
                         ? theme === 'dark'
-                          ? 'text-purple-300'
-                          : 'text-purple-700'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-purple-500 text-white'
                         : isCompleted
                           ? theme === 'dark'
-                            ? 'text-gray-300'
-                            : 'text-gray-700'
+                            ? 'bg-purple-900/30 text-purple-300'
+                            : 'bg-purple-100 text-purple-700'
                           : theme === 'dark'
-                            ? 'text-gray-500'
-                            : 'text-gray-400'
+                            ? 'bg-gray-800 text-gray-400'
+                            : 'bg-gray-100 text-gray-400'
                     )}
                   >
-                    {step.label}
+                    {isCompleted ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <span>{step.number}</span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div
+                      className={cn(
+                        'text-sm font-medium',
+                        isActive
+                          ? theme === 'dark'
+                            ? 'text-purple-300'
+                            : 'text-purple-700'
+                          : isCompleted
+                            ? theme === 'dark'
+                              ? 'text-gray-300'
+                              : 'text-gray-700'
+                            : theme === 'dark'
+                              ? 'text-gray-500'
+                              : 'text-gray-400'
+                      )}
+                    >
+                      {step.label}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Button>
               {index < steps.length - 1 && (
                 <div
-                  className={classNames(
+                  className={cn(
                     'ml-5 mt-4 h-8 w-0.5',
                     isCompleted
                       ? theme === 'dark'
@@ -113,7 +116,7 @@ export default function StepIndicator() {
                   )}
                 />
               )}
-            </button>
+            </div>
           )
         })}
       </nav>

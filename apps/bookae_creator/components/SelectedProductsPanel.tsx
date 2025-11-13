@@ -2,6 +2,9 @@
 
 import { X, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { useVideoCreateStore, Product } from '../store/useVideoCreateStore'
 import { useThemeStore } from '../store/useThemeStore'
 
@@ -39,29 +42,17 @@ export default function SelectedProductsPanel() {
   }
 
   return (
-    <div
-      className={`sticky top-8 w-72 xl:w-80 h-[calc(50vh-4rem)] flex flex-col ${
-        theme === 'dark'
-          ? 'bg-gray-800 border-gray-700'
-          : 'bg-white border-gray-200'
-      } rounded-lg shadow-lg border`}
-    >
-      <div className={`p-4 border-b ${
-        theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-      }`}>
-        <h2 className={`text-lg font-semibold ${
-          theme === 'dark' ? 'text-white' : 'text-gray-900'
-        }`}>
-          선택된 상품
-        </h2>
-        <p className={`text-sm mt-1 ${
+    <Card className="sticky top-8 w-72 xl:w-80 h-[calc(50vh-4rem)] flex flex-col">
+      <CardHeader>
+        <CardTitle>선택된 상품</CardTitle>
+        <p className={`text-sm ${
           theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
         }`}>
           {selectedProducts.length}개 선택됨
         </p>
-      </div>
+      </CardHeader>
 
-      <div
+      <CardContent
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragEnter={(e) => {
@@ -72,12 +63,12 @@ export default function SelectedProductsPanel() {
           e.preventDefault()
           e.currentTarget.classList.remove('border-purple-500', 'bg-purple-50', 'dark:bg-purple-900/20')
         }}
-        className={`flex-1 overflow-y-auto p-4 ${
+        className={`flex-1 overflow-y-auto ${
           selectedProducts.length === 0
-            ? `flex items-center justify-center border-2 border-dashed rounded-lg m-4 ${
-                theme === 'dark'
-                  ? 'border-gray-700 bg-gray-900/50'
-                  : 'border-gray-300 bg-gray-50'
+            ? `flex items-center justify-center border border-dashed rounded-lg ${
+                theme === 'dark' 
+                  ? 'border-gray-600' 
+                  : 'border-gray-300'
               }`
             : ''
         }`}
@@ -92,71 +83,56 @@ export default function SelectedProductsPanel() {
         ) : (
           <div className="space-y-3">
             {selectedProducts.map((product) => (
-              <div
-                key={product.id}
-                className={`p-3 rounded-lg border ${
-                  theme === 'dark'
-                    ? 'bg-gray-900 border-gray-700'
-                    : 'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg " />
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold text-sm mb-1 line-clamp-2 ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    }`}>
-                      {product.name}
-                    </h3>
-                    <p className={`text-xs mb-1 ${
-                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
-                      {product.price.toLocaleString()}원
-                    </p>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      theme === 'dark'
-                        ? 'bg-purple-900/30 text-purple-300'
-                        : 'bg-purple-100 text-purple-700'
-                    }`}>
-                      {product.platform === 'coupang' ? '쿠팡' :
-                       product.platform === 'naver' ? '네이버' :
-                       product.platform === 'aliexpress' ? '알리익스프레스' :
-                       '아마존'}
-                    </span>
+              <Card key={product.id}>
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold text-sm mb-1 line-clamp-2 ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {product.name}
+                      </h3>
+                      <p className={`text-xs mb-1 ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                        {product.price.toLocaleString()}원
+                      </p>
+                      <Badge variant="secondary" className="text-xs">
+                        {product.platform === 'coupang' ? '쿠팡' :
+                         product.platform === 'naver' ? '네이버' :
+                         product.platform === 'aliexpress' ? '알리익스프레스' :
+                         '아마존'}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeProduct(product.id)}
+                      className="h-8 w-8"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <button
-                    onClick={() => removeProduct(product.id)}
-                    className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0 ${
-                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    }`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
-      </div>
+      </CardContent>
 
       {/* 다음 단계 버튼 */}
-      <div className={`p-4 border-t ${
-        theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-      }`}>
-        <button
+      <div className="p-4">
+        <Button
           onClick={handleNext}
           disabled={selectedProducts.length === 0}
-          className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
-            selectedProducts.length === 0
-              ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-              : 'bg-purple-500 hover:bg-purple-600 text-white'
-          }`}
+          className="w-full gap-2"
         >
           <span>다음 단계</span>
-          <ArrowRight className="w-5 h-5" />
-        </button>
+          <ArrowRight className="h-5 w-5" />
+        </Button>
       </div>
-    </div>
+    </Card>
   )
 }
 

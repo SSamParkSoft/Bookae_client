@@ -234,7 +234,7 @@ export default function Step1Page() {
 
   const handleNext = () => {
     if (selectedProducts.length > 0) {
-      router.push('/video/create/step2')
+      router.push('/video/create/script-method')
     }
   }
 

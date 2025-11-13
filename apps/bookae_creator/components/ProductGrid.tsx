@@ -2,6 +2,10 @@
 
 import { useState } from 'react'
 import { Search, ShoppingCart } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Product, Platform, useVideoCreateStore } from '../store/useVideoCreateStore'
 import { useThemeStore } from '../store/useThemeStore'
 
@@ -148,47 +152,33 @@ export default function ProductGrid() {
           <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
             theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
           }`} />
-          <input
+          <Input
             type="text"
             placeholder="상품 검색..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-              theme === 'dark'
-                ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-400'
-                : 'bg-white border-gray-300 text-gray-900'
-            }`}
+            className="pl-10"
           />
         </div>
 
         {/* 플랫폼 탭 */}
         <div className="flex gap-2 flex-wrap">
-          <button
+          <Button
             onClick={() => setSelectedPlatform('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedPlatform === 'all'
-                ? 'bg-purple-500 text-white'
-                : theme === 'dark'
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            variant={selectedPlatform === 'all' ? 'default' : 'outline'}
+            size="sm"
           >
             전체
-          </button>
+          </Button>
           {(Object.keys(platformNames) as Platform[]).map((platform) => (
-            <button
+            <Button
               key={platform}
               onClick={() => setSelectedPlatform(platform)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedPlatform === platform
-                  ? 'bg-purple-500 text-white'
-                  : theme === 'dark'
-                    ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              variant={selectedPlatform === platform ? 'default' : 'outline'}
+              size="sm"
             >
               {platformNames[platform]}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -199,48 +189,46 @@ export default function ProductGrid() {
           {filteredProducts().map((product) => {
             const isSelected = isProductSelected(product.id)
             return (
-              <div
+              <Card
                 key={product.id}
                 draggable
                 onDragStart={(e) => handleDragStart(e, product)}
                 onClick={() => !isSelected && addProduct(product)}
-                className={`p-4 rounded-lg border-2 cursor-move transition-all ${
+                className={`cursor-move transition-all ${
                   isSelected
-                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                    : theme === 'dark'
-                      ? 'border-gray-700 bg-gray-800 hover:border-purple-600'
-                      : 'border-gray-200 bg-white hover:border-purple-300'
+                    ? 'border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                    : ''
                 }`}
               >
-                <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
-                  <ShoppingCart className="w-8 h-8 text-gray-400" />
-                </div>
-                <div className={`text-xs font-medium mb-1 ${
-                  theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                }`}>
-                  {platformNames[product.platform]}
-                </div>
-                <h3 className={`font-semibold text-sm mb-1 line-clamp-2 ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}>
-                  {product.name}
-                </h3>
-                <p className={`text-xs mb-2 line-clamp-1 ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}>
-                  {product.description}
-                </p>
-                <div className={`text-lg font-bold ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}>
-                  {product.price.toLocaleString()}원
-                </div>
-                {isSelected && (
-                  <div className="mt-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
-                    선택됨
+                <CardContent className="p-4">
+                  <div className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
+                    <ShoppingCart className="w-8 h-8 text-gray-400" />
                   </div>
-                )}
-              </div>
+                  <Badge variant="secondary" className="text-xs mb-1">
+                    {platformNames[product.platform]}
+                  </Badge>
+                  <h3 className={`font-semibold text-sm mb-1 line-clamp-2 ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    {product.name}
+                  </h3>
+                  <p className={`text-xs mb-2 line-clamp-1 ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    {product.description}
+                  </p>
+                  <div className={`text-lg font-bold ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    {product.price.toLocaleString()}원
+                  </div>
+                  {isSelected && (
+                    <Badge variant="default" className="mt-2">
+                      선택됨
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
             )
           })}
         </div>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Video, BarChart3, User } from 'lucide-react'
 import classNames from 'classnames'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useThemeStore } from '../store/useThemeStore'
 
 const navigation = [
@@ -47,18 +48,52 @@ export default function Sidebar() {
               key={item.name}
               href={item.href}
               className={classNames(
-                'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                'group relative flex items-center gap-3 px-4 py-3 rounded-lg overflow-hidden transition-colors duration-200',
                 isActive
                   ? theme === 'dark'
-                    ? 'bg-purple-900/30 text-purple-300 font-medium'
-                    : 'bg-purple-50 text-purple-700 font-medium'
+                    ? 'text-purple-200 font-medium'
+                    : 'text-purple-700 font-medium'
                   : theme === 'dark'
-                    ? 'text-gray-300 hover:bg-gray-800'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'text-gray-300 hover:bg-gray-800/80'
+                    : 'text-gray-700 hover:bg-gray-100'
               )}
             >
-              <Icon className="w-5 h-5" />
-              <span>{item.name}</span>
+              <AnimatePresence initial={false}>
+                {isActive && (
+                  <motion.span
+                    layoutId="sidebar-active-indicator"
+                    className={classNames(
+                      'absolute inset-0 rounded-lg pointer-events-none',
+                      theme === 'dark'
+                        ? 'bg-purple-900/40'
+                        : 'bg-purple-100'
+                    )}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 480, damping: 32, mass: 0.55 }}
+                  />
+                )}
+              </AnimatePresence>
+              <motion.span
+                layout
+                className="relative z-10 flex items-center gap-3 w-full"
+                transition={{ type: 'spring', stiffness: 420, damping: 30, mass: 0.55 }}
+              >
+                <Icon
+                  className={classNames(
+                    'w-5 h-5 transition-colors duration-200',
+                    isActive
+                      ? theme === 'dark'
+                        ? 'text-purple-100'
+                        : 'text-purple-600'
+                      : theme === 'dark'
+                        ? 'text-gray-400 group-hover:text-gray-200'
+                        : 'text-gray-500 group-hover:text-gray-800'
+                  )}
+                />
+                <span className="transition-colors duration-200">{item.name}</span>
+              </motion.span>
             </Link>
           )
         })}

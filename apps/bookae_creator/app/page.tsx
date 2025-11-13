@@ -1,12 +1,19 @@
 'use client'
 
+import { motion } from 'framer-motion'
 import { useAppStore } from '../store/useAppStore'
 
 export default function HomePage() {
   const { productUrl, setProductUrl } = useAppStore()
 
   return (
-    <div className="p-8">
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="p-8"
+    >
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">📦 부캐 상품 자동화 서비스</h1>
         <p className="text-gray-600 mb-8">상품 정보를 자동으로 크롤링하고 영상을 생성합니다</p>
@@ -29,6 +36,6 @@ export default function HomePage() {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
