@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { PenTool, Bot, ArrowRight, Loader2 } from 'lucide-react'
+import { PenTool, Bot, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,11 +16,12 @@ import ConceptToneDialog from '@/components/ConceptToneDialog'
 
 export default function Step2Page() {
   const router = useRouter()
-  const { scriptMethod, setScriptMethod, setIsCreating, setCreationProgress, isCreating, creationProgress } = useVideoCreateStore()
+  const { scriptMethod, setScriptMethod, setIsCreating, setCreationProgress } = useVideoCreateStore()
   const theme = useThemeStore((state) => state.theme)
   const [showConceptDialog, setShowConceptDialog] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState<'edit' | 'auto'>(scriptMethod || 'edit')
   const [hasSelected, setHasSelected] = useState(false)
+  const [localProgress, setLocalProgress] = useState(0)
 
   const handleMethodChange = (value: string) => {
     const method = value as 'edit' | 'auto'
@@ -33,30 +34,60 @@ export default function Step2Page() {
   const handleStart = () => {
     setScriptMethod(selectedMethod)
     setHasSelected(true)
+    setLocalProgress(0)
     
     // AI 생성 시작
     setIsCreating(true)
     setCreationProgress(0)
-    
-    // 진행률 시뮬레이션
-    const interval = setInterval(() => {
-      setCreationProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsCreating(false)
-          // 생성 완료 후 step3로 이동
-          setTimeout(() => {
-            router.push('/video/create/step3')
-          }, 500)
-          return 100
-        }
-        return prev + 2
-      })
-    }, 100)
   }
 
+  // 진행률 시뮬레이션 및 3초 후 step3로 이동
+  useEffect(() => {
+    if (hasSelected) {
+      // 초기 진행률을 0으로 설정
+      setLocalProgress(0)
+      setCreationProgress(0)
+      
+      // 각 단계별로 30%씩 증가
+      // 1초 후: 대본 생성 완료 → 30%
+      const timer1 = setTimeout(() => {
+        setLocalProgress(30)
+        setCreationProgress(30)
+      }, 1000)
+
+      // 2초 후: 영상 편집 완료 → 60%
+      const timer2 = setTimeout(() => {
+        setLocalProgress(60)
+        setCreationProgress(60)
+      }, 2000)
+
+      // 3초 후: 최종 검토 완료 → 90%
+      const timer3 = setTimeout(() => {
+        setLocalProgress(90)
+        setCreationProgress(90)
+      }, 3000)
+
+      // 3.5초 후: 전체 완료 → 100% 및 step3로 이동
+      const timer4 = setTimeout(() => {
+        setLocalProgress(100)
+        setCreationProgress(100)
+        setIsCreating(false)
+        router.push('/video/create/step3')
+      }, 3500)
+      
+      return () => {
+        clearTimeout(timer1)
+        clearTimeout(timer2)
+        clearTimeout(timer3)
+        clearTimeout(timer4)
+      }
+    }
+  }, [hasSelected, router, setIsCreating, setCreationProgress])
+
   // AI 생성 중 UI
-  if (hasSelected && isCreating) {
+  if (hasSelected) {
+    const isComplete = localProgress >= 100
+    
     return (
       <motion.div
         initial={{ opacity: 0, x: 20 }}
@@ -70,19 +101,41 @@ export default function Step2Page() {
           <div className="flex-1 p-4 md:p-8 overflow-y-auto min-w-0 flex items-center justify-center">
             <div className="max-w-2xl mx-auto text-center space-y-8">
               <div className="space-y-4">
-                <Loader2 className={`w-16 h-16 mx-auto animate-spin ${
-                  theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                }`} />
-                <h1 className={`text-3xl font-bold ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}>
-                  AI가 영상을 생성하고 있어요
-                </h1>
-                <p className={`text-lg ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  잠시만 기다려주세요...
-                </p>
+                <motion.div
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {isComplete ? (
+                    <CheckCircle2 className={`w-16 h-16 mx-auto ${
+                      theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                    }`} />
+                  ) : (
+                    <Loader2 className={`w-16 h-16 mx-auto animate-spin ${
+                      theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                    }`} />
+                  )}
+                </motion.div>
+                <motion.h1 
+                  key={isComplete ? 'complete' : 'creating'}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`text-3xl font-bold ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
+                >
+                  {isComplete ? '생성 완료!' : 'AI가 영상을 생성하고 있어요'}
+                </motion.h1>
+                <motion.p 
+                  key={isComplete ? 'complete-desc' : 'creating-desc'}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`text-lg ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`}
+                >
+                  {isComplete ? '영상 생성이 완료되었습니다!' : '잠시만 기다려주세요...'}
+                </motion.p>
               </div>
 
               {/* 진행률 표시 */}
@@ -91,19 +144,28 @@ export default function Step2Page() {
                   theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
                 }`}>
                   <motion.div
-                    className={`h-full ${
-                      theme === 'dark' ? 'bg-purple-500' : 'bg-purple-600'
+                    className={`h-full transition-colors ${
+                      isComplete
+                        ? theme === 'dark' ? 'bg-green-500' : 'bg-green-600'
+                        : theme === 'dark' ? 'bg-purple-500' : 'bg-purple-600'
                     }`}
                     initial={{ width: 0 }}
-                    animate={{ width: `${creationProgress}%` }}
+                    animate={{ width: `${Math.min(localProgress, 100)}%` }}
                     transition={{ duration: 0.3 }}
                   />
                 </div>
-                <p className={`text-sm ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  {creationProgress}% 완료
-                </p>
+                <motion.p 
+                  className={`text-sm font-medium ${
+                    isComplete
+                      ? theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                      : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`}
+                  key={Math.round(localProgress)}
+                  initial={{ scale: 1.1 }}
+                  animate={{ scale: 1 }}
+                >
+                  {Math.round(localProgress)}% 완료
+                </motion.p>
               </div>
 
               {/* 생성 중 단계 표시 */}
@@ -111,42 +173,63 @@ export default function Step2Page() {
                 theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
               }`}>
                 <div className="space-y-3 text-left">
-                  <div className={`flex items-center gap-3 ${
-                    creationProgress >= 20 ? 'opacity-100' : 'opacity-50'
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full ${
-                      creationProgress >= 20
-                        ? theme === 'dark' ? 'bg-green-400' : 'bg-green-600'
-                        : theme === 'dark' ? 'bg-gray-600' : 'bg-gray-400'
-                    }`} />
+                  <motion.div 
+                    className={`flex items-center gap-3 transition-all ${
+                      localProgress >= 30 ? 'opacity-100' : 'opacity-50'
+                    }`}
+                    animate={localProgress >= 30 ? { x: 0 } : { x: -10 }}
+                  >
+                    {localProgress >= 30 ? (
+                      <CheckCircle2 className={`w-5 h-5 ${
+                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                      }`} />
+                    ) : (
+                      <div className={`w-2 h-2 rounded-full ${
+                        theme === 'dark' ? 'bg-gray-600' : 'bg-gray-400'
+                      }`} />
+                    )}
                     <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                      대본 생성 중...
+                      {localProgress >= 30 ? '대본 생성 완료' : '대본 생성 중...'}
                     </span>
-                  </div>
-                  <div className={`flex items-center gap-3 ${
-                    creationProgress >= 50 ? 'opacity-100' : 'opacity-50'
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full ${
-                      creationProgress >= 50
-                        ? theme === 'dark' ? 'bg-green-400' : 'bg-green-600'
-                        : theme === 'dark' ? 'bg-gray-600' : 'bg-gray-400'
-                    }`} />
+                  </motion.div>
+                  <motion.div 
+                    className={`flex items-center gap-3 transition-all ${
+                      localProgress >= 60 ? 'opacity-100' : 'opacity-50'
+                    }`}
+                    animate={localProgress >= 60 ? { x: 0 } : { x: -10 }}
+                  >
+                    {localProgress >= 60 ? (
+                      <CheckCircle2 className={`w-5 h-5 ${
+                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                      }`} />
+                    ) : (
+                      <div className={`w-2 h-2 rounded-full ${
+                        theme === 'dark' ? 'bg-gray-600' : 'bg-gray-400'
+                      }`} />
+                    )}
                     <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                      영상 편집 중...
+                      {localProgress >= 60 ? '영상 편집 완료' : '영상 편집 중...'}
                     </span>
-                  </div>
-                  <div className={`flex items-center gap-3 ${
-                    creationProgress >= 80 ? 'opacity-100' : 'opacity-50'
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full ${
-                      creationProgress >= 80
-                        ? theme === 'dark' ? 'bg-green-400' : 'bg-green-600'
-                        : theme === 'dark' ? 'bg-gray-600' : 'bg-gray-400'
-                    }`} />
+                  </motion.div>
+                  <motion.div 
+                    className={`flex items-center gap-3 transition-all ${
+                      localProgress >= 90 ? 'opacity-100' : 'opacity-50'
+                    }`}
+                    animate={localProgress >= 90 ? { x: 0 } : { x: -10 }}
+                  >
+                    {localProgress >= 90 ? (
+                      <CheckCircle2 className={`w-5 h-5 ${
+                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                      }`} />
+                    ) : (
+                      <div className={`w-2 h-2 rounded-full ${
+                        theme === 'dark' ? 'bg-gray-600' : 'bg-gray-400'
+                      }`} />
+                    )}
                     <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                      최종 검토 중...
+                      {localProgress >= 90 ? '최종 검토 완료' : '최종 검토 중...'}
                     </span>
-                  </div>
+                  </motion.div>
                 </div>
               </div>
             </div>
