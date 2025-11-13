@@ -40,7 +40,7 @@ export default function Step3Page() {
       <div className="flex w-full max-w-[1600px]">
         <StepIndicator />
         <div className="flex-1 p-4 md:p-8 overflow-y-auto min-w-0">
-          <div className="max-w-5xl mx-auto space-y-6">
+          <div className="max-w-5xl mx-auto space-y-8">
             <div>
               <h1 className={`text-3xl font-bold mb-2 ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
@@ -53,7 +53,11 @@ export default function Step3Page() {
             </div>
 
             {/* 선택된 상품 편집 */}
-            <div className="space-y-4">
+            <div className={`space-y-4 p-6 rounded-lg border ${
+              theme === 'dark' 
+                ? 'bg-gray-800/50 border-gray-700' 
+                : 'bg-gray-50 border-gray-200'
+            }`}>
               <h2 className={`text-xl font-semibold ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
               }`}>
@@ -65,7 +69,11 @@ export default function Step3Page() {
             </div>
 
             {/* 유튜브 영상제목 입력 */}
-            <div>
+            <div className={`p-6 rounded-lg border ${
+              theme === 'dark' 
+                ? 'bg-gray-800/50 border-gray-700' 
+                : 'bg-gray-50 border-gray-200'
+            }`}>
               <h2 className={`text-xl font-semibold mb-4 ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
               }`}>
@@ -76,7 +84,11 @@ export default function Step3Page() {
 
             {/* 스크립트 편집 (편집 모드만) */}
             {isEditMode && (
-              <div>
+              <div className={`p-6 rounded-lg border ${
+                theme === 'dark' 
+                  ? 'bg-gray-800/50 border-gray-700' 
+                  : 'bg-gray-50 border-gray-200'
+              }`}>
                 <h2 className={`text-xl font-semibold mb-4 ${
                   theme === 'dark' ? 'text-white' : 'text-gray-900'
                 }`}>
@@ -87,7 +99,11 @@ export default function Step3Page() {
             )}
 
             {/* 효과 선택 */}
-            <div className="space-y-4">
+            <div className={`space-y-4 p-6 rounded-lg border ${
+              theme === 'dark' 
+                ? 'bg-gray-800/50 border-gray-700' 
+                : 'bg-gray-50 border-gray-200'
+            }`}>
               <h2 className={`text-xl font-semibold ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
               }`}>
@@ -247,7 +263,11 @@ export default function Step3Page() {
               </div>
 
               {/* 상품 가격 정보 표시 */}
-              <PriceInfoToggle />
+              <div className={`pt-4 mt-4 border-t ${
+                theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+              }`}>
+                <PriceInfoToggle />
+              </div>
             </div>
 
             {/* 다음 단계 버튼 */}
