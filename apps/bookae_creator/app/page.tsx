@@ -2,12 +2,14 @@
 
 import { motion } from 'framer-motion'
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCoupangStats } from '@/lib/hooks/useCoupangStats'
 import { useYouTubeVideos } from '@/lib/hooks/useYouTubeVideos'
+import { useYouTubeStats } from '@/lib/hooks/useYouTubeStats'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useThemeStore } from '@/store/useThemeStore'
-import { TrendingUp, ShoppingCart, Eye, Loader2, Youtube, Users, Store } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Eye, Loader2, Youtube, Users, Store, DollarSign, Video, ArrowRight } from 'lucide-react'
 
 const formatNumber = (num: number): string => {
   if (num >= 1000000) {
@@ -27,8 +29,10 @@ const formatCurrency = (num: number): string => {
 }
 
 export default function HomePage() {
+  const router = useRouter()
   const { data: coupangData, isLoading: coupangLoading } = useCoupangStats()
   const { data: youtubeVideos, isLoading: youtubeLoading } = useYouTubeVideos()
+  const { data: youtubeStats, isLoading: youtubeStatsLoading } = useYouTubeStats()
   const theme = useThemeStore((state) => state.theme)
   const [isComingSoonOpen, setIsComingSoonOpen] = useState(false)
 
@@ -45,14 +49,14 @@ export default function HomePage() {
     return Object.entries(categoryCount)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
+      .slice(0, 10)
   }, [coupangData])
 
   // 가장 많이 팔린 상품 TOP 5
   const topProducts = useMemo(() => {
     if (!coupangData?.dailyOrders) return []
     
-    const productMap: Record<string, { name: string; orderCount: number; totalGmv: number; totalCommission: number }> = {}
+    const productMap: Record<string, { name: string; orderCount: number; totalGmv: number; totalCommission: number; thumbnailUrl?: string }> = {}
     
     coupangData.dailyOrders.forEach((order) => {
       const productName = order.productName
@@ -62,11 +66,16 @@ export default function HomePage() {
           orderCount: 0,
           totalGmv: 0,
           totalCommission: 0,
+          thumbnailUrl: order.thumbnailUrl,
         }
       }
       productMap[productName].orderCount += 1
       productMap[productName].totalGmv += order.gmv
       productMap[productName].totalCommission += order.commission
+      // 썸네일이 없으면 첫 번째 주문의 썸네일 사용
+      if (!productMap[productName].thumbnailUrl && order.thumbnailUrl) {
+        productMap[productName].thumbnailUrl = order.thumbnailUrl
+      }
     })
 
     return Object.values(productMap)
@@ -84,7 +93,26 @@ export default function HomePage() {
       .slice(0, 5)
   }, [youtubeVideos])
 
-  const isLoading = coupangLoading || youtubeLoading
+  // 통계 요약 계산
+  const summaryStats = useMemo(() => {
+    const coupangRevenue = coupangData?.dailyRevenue.reduce((sum, item) => sum + item.commission, 0) || 0
+    const coupangOrders = coupangData?.dailyOrders.length || 0
+    const coupangViews = coupangData?.dailyViews.reduce((sum, item) => sum + item.click, 0) || 0
+    const youtubeRevenue = youtubeStats?.totalEstimatedRevenue || 0
+    const youtubeViews = youtubeStats?.views || 0
+    const totalRevenue = coupangRevenue + youtubeRevenue
+
+    return {
+      totalRevenue,
+      coupangRevenue,
+      coupangOrders,
+      coupangViews,
+      youtubeRevenue,
+      youtubeViews,
+    }
+  }, [coupangData, youtubeStats])
+
+  const isLoading = coupangLoading || youtubeLoading || youtubeStatsLoading
 
   return (
     <motion.div
@@ -109,6 +137,7 @@ export default function HomePage() {
           </p>
         </div>
 
+        {/* 통계 요약 및 영상 만들러가기 */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-purple-600 dark:text-purple-400" />
@@ -119,7 +148,156 @@ export default function HomePage() {
             </span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <>
+            {/* 통계 요약 섹션 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+              >
+                <Card className={`h-full border-2 ${
+                  theme === 'dark' 
+                    ? 'border-purple-700 bg-purple-900/20' 
+                    : 'border-purple-200 bg-purple-50/50'
+                }`}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className={`p-3 rounded-lg ${
+                        theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+                      }`}>
+                        <DollarSign className={`w-6 h-6 ${
+                          theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                        }`} />
+                      </div>
+                    </div>
+                    <CardTitle className={`text-2xl font-bold mt-4 ${
+                      theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+                    }`}>
+                      {formatCurrency(summaryStats.totalRevenue)}
+                    </CardTitle>
+                    <p className={`text-sm mt-1 ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      총 수익
+                    </p>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+              >
+                <Card className="h-full">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className={`p-3 rounded-lg ${
+                        theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+                      }`}>
+                        <ShoppingCart className={`w-6 h-6 ${
+                          theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                        }`} />
+                      </div>
+                    </div>
+                    <CardTitle className={`text-2xl font-bold mt-4 ${
+                      theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+                    }`}>
+                      {formatCurrency(summaryStats.coupangRevenue)}
+                    </CardTitle>
+                    <p className={`text-sm mt-1 ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      쿠팡 수익
+                    </p>
+                    <p className={`text-xs mt-1 ${
+                      theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
+                    }`}>
+                      주문 {summaryStats.coupangOrders}건
+                    </p>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <Card className="h-full">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className={`p-3 rounded-lg ${
+                        theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+                      }`}>
+                        <Youtube className={`w-6 h-6 ${
+                          theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                        }`} />
+                      </div>
+                    </div>
+                    <CardTitle className={`text-2xl font-bold mt-4 ${
+                      theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+                    }`}>
+                      {formatCurrency(summaryStats.youtubeRevenue)}
+                    </CardTitle>
+                    <p className={`text-sm mt-1 ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      유튜브 수익
+                    </p>
+                    <p className={`text-xs mt-1 ${
+                      theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
+                    }`}>
+                      조회수 {formatNumber(summaryStats.youtubeViews)}
+                    </p>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
+              >
+                <Card 
+                  className={`h-full cursor-pointer transition-all hover:shadow-lg ${
+                    theme === 'dark' 
+                      ? 'border-purple-700 hover:bg-purple-900/30' 
+                      : 'border-purple-300 hover:bg-purple-50'
+                  }`}
+                  onClick={() => router.push('/video/create')}
+                >
+                  <CardHeader className="h-full flex flex-col justify-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                        theme === 'dark' 
+                          ? 'bg-purple-600' 
+                          : 'bg-purple-600'
+                      }`}>
+                        <Video className="w-8 h-8 text-white" />
+                      </div>
+                      <div className="text-center">
+                        <CardTitle className={`text-xl font-bold mb-2 ${
+                          theme === 'dark' ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          영상 만들러가기
+                        </CardTitle>
+                        <div className={`flex items-center justify-center gap-2 text-sm ${
+                          theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
+                        }`}>
+                          <span>시작하기</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+            </div>
+
+            {/* 기존 섹션들 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 금주의 핫 키워드 */}
             <Card>
               <CardHeader>
@@ -216,24 +394,57 @@ export default function HomePage() {
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-3 flex-1">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-                              index === 0
-                                ? theme === 'dark'
-                                  ? 'bg-purple-600 text-purple-100'
-                                  : 'bg-purple-600 text-white'
-                                : index === 1
-                                ? theme === 'dark'
-                                  ? 'bg-purple-700/60 text-purple-200'
-                                  : 'bg-purple-500 text-white'
-                                : index === 2
-                                ? theme === 'dark'
-                                  ? 'bg-purple-800/50 text-purple-300'
-                                  : 'bg-purple-400 text-white'
-                                : theme === 'dark'
-                                  ? 'bg-purple-900/40 text-purple-400'
-                                  : 'bg-purple-100 text-purple-700'
-                            }`}>
-                              {index + 1}
+                            {/* 썸네일 이미지 */}
+                            <div className="relative flex-shrink-0">
+                              <div className="w-16 h-16 rounded-lg overflow-hidden border border-purple-200 dark:border-purple-800">
+                                {product.thumbnailUrl ? (
+                                  <img
+                                    src={product.thumbnailUrl}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      // 이미지 로드 실패 시 기본 아이콘 표시
+                                      const target = e.target as HTMLImageElement
+                                      target.style.display = 'none'
+                                      const fallback = target.parentElement?.querySelector('.thumbnail-fallback') as HTMLElement
+                                      if (fallback) {
+                                        fallback.style.display = 'flex'
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <div 
+                                  className={`w-full h-full rounded-lg flex items-center justify-center thumbnail-fallback ${
+                                    product.thumbnailUrl ? 'hidden' : 'flex'
+                                  } ${
+                                    theme === 'dark' ? 'bg-purple-900/40' : 'bg-purple-100'
+                                  }`}
+                                >
+                                  <ShoppingCart className={`w-6 h-6 ${
+                                    theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                                  }`} />
+                                </div>
+                              </div>
+                              {/* 순위 배지 */}
+                              <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-md ${
+                                index === 0
+                                  ? theme === 'dark'
+                                    ? 'bg-purple-600 text-purple-100'
+                                    : 'bg-purple-600 text-white'
+                                  : index === 1
+                                  ? theme === 'dark'
+                                    ? 'bg-purple-700/80 text-purple-200'
+                                    : 'bg-purple-500 text-white'
+                                  : index === 2
+                                  ? theme === 'dark'
+                                    ? 'bg-purple-800/70 text-purple-300'
+                                    : 'bg-purple-400 text-white'
+                                  : theme === 'dark'
+                                    ? 'bg-purple-900/60 text-purple-400'
+                                    : 'bg-purple-300 text-purple-900'
+                              }`}>
+                                {index + 1}
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className={`font-medium truncate ${
@@ -434,7 +645,8 @@ export default function HomePage() {
                 </motion.div>
               </CardContent>
             </Card>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
