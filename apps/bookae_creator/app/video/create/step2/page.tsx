@@ -537,7 +537,6 @@ export default function Step2Page() {
                   conceptId={selectedScriptStyle}
                   toneId={selectedTone}
                   minScenes={5}
-                  maxScenes={6}
                   onComplete={handleAutoScenesComplete}
                 />
               </motion.section>

@@ -38,7 +38,7 @@ export default function AutoModeSection({
   conceptId,
   toneId,
   minScenes = 5,
-  maxScenes = 6,
+  maxScenes,
   onComplete,
 }: AutoModeSectionProps) {
   const theme = useThemeStore((state) => state.theme)
@@ -135,16 +135,19 @@ export default function AutoModeSection({
     }, SCENE_LOADING_STEPS.length * 700 + 400)
   }
 
-  const handleConfirmScene = (sceneId: string) => {
-    const status = sceneStatuses[sceneId]
-    if (!status || status.state === 'ready' || status.state === 'loading') return
-    simulateSceneLoading(sceneId)
-  }
-
   const handleSceneChange = (sceneId: string, updates: Partial<AutoScene>) => {
     setScenes((prev) =>
       prev.map((scene) => (scene.id === sceneId ? { ...scene, ...updates } : scene)),
     )
+  }
+
+  const handleConfirmAllScenes = () => {
+    scenes.forEach((scene) => {
+      const status = sceneStatuses[scene.id]
+      if (!status || status.state === 'idle') {
+        simulateSceneLoading(scene.id)
+      }
+    })
   }
 
   const handleRegenerateScripts = () => {
@@ -174,7 +177,7 @@ export default function AutoModeSection({
         onSelectAsset={handleSelectAsset}
         onRemoveScene={handleRemoveScene}
         onReorderScenes={handleReorderScenes}
-        onConfirmScene={handleConfirmScene}
+        onConfirmAllScenes={handleConfirmAllScenes}
       />
 
       <SceneScriptBoard
