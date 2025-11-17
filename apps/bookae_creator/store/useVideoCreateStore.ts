@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ConceptType } from '@/lib/data/templates'
+import type { AutoScene } from '@/lib/types/video'
 
 export type Platform = 'coupang' | 'naver' | 'aliexpress' | 'amazon'
 
@@ -30,6 +31,7 @@ export interface Step2Result {
   mode: Step2Mode
   finalScript: string
   selectedImages?: string[] // auto 모드용
+  scenes?: AutoScene[] // auto 모드용
   uploadedVideo?: File // manual 모드용
   draftVideo: string // AI 초안 영상 경로
 }

@@ -12,9 +12,10 @@ import { useVideoCreateStore, Step2Mode } from '@/store/useVideoCreateStore'
 import { useThemeStore } from '@/store/useThemeStore'
 import ConceptToneDialog from '@/components/ConceptToneDialog'
 import ScriptTypingEffect from '@/components/ScriptTypingEffect'
-import ImageSelectionPanel from '@/components/ImageSelectionPanel'
 import VideoUploader from '@/components/VideoUploader'
 import { conceptOptions, conceptTones, type ConceptType } from '@/lib/data/templates'
+import AutoModeSection from '@/components/AutoModeSection'
+import type { AutoScene } from '@/lib/types/video'
 
 export default function Step2Page() {
   const router = useRouter()
@@ -26,7 +27,6 @@ export default function Step2Page() {
   const [selectedTone, setSelectedTone] = useState<string | null>(null)
   const [generatedScript, setGeneratedScript] = useState<string>('')
   const [finalScript, setFinalScript] = useState<string>('')
-  const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [uploadedVideos, setUploadedVideos] = useState<File[]>([])
   const [showConceptDialog, setShowConceptDialog] = useState(false)
   const [isGeneratingScript, setIsGeneratingScript] = useState(false)
@@ -66,12 +66,13 @@ export default function Step2Page() {
     setSelectedTone(toneId)
     setConcept(concept)
     setTone(toneId)
-    setActiveSteps((prev) => ({ ...prev, scriptGenerating: true, isGeneratingScript: true }))
-    setIsGeneratingScript(true)
-    // 스크롤
-    setTimeout(() => {
-      scriptGeneratingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
+    if (mode === 'manual') {
+      setActiveSteps((prev) => ({ ...prev, scriptGenerating: true }))
+      setIsGeneratingScript(true)
+      setTimeout(() => {
+        scriptGeneratingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
   }
 
   // 대본 생성 완료
@@ -108,17 +109,11 @@ export default function Step2Page() {
 
   // 대본 확정
   const handleConfirmScript = () => {
-    if (mode === 'manual') {
-      setActiveSteps((prev) => ({ ...prev, shootingGuide: true }))
-      setTimeout(() => {
-        shootingGuideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 100)
-    } else {
-      setActiveSteps((prev) => ({ ...prev, imageSelection: true }))
-      setTimeout(() => {
-        imageSelectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 100)
-    }
+    if (mode !== 'manual') return
+    setActiveSteps((prev) => ({ ...prev, shootingGuide: true }))
+    setTimeout(() => {
+      shootingGuideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
 
   // 촬영 안내 후 업로드로 이동
@@ -134,21 +129,31 @@ export default function Step2Page() {
     setUploadedVideos(files)
   }
 
-  // 이미지 선택 변경
-  const handleImageSelectionChange = (images: string[]) => {
-    setSelectedImages(images)
-  }
-
   // STEP3로 이동 (영상 편집 단계)
   const handleGoToStep3 = () => {
+    if (mode !== 'manual') return
     // STEP2 결과 저장
     const result = {
       mode: mode!,
       finalScript,
-      ...(mode === 'auto' ? { selectedImages } : uploadedVideos.length > 0 ? { uploadedVideo: uploadedVideos[0] } : {}),
+      ...(uploadedVideos.length > 0 ? { uploadedVideo: uploadedVideos[0] } : {}),
       draftVideo: '', // STEP3에서 생성할 예정
     }
 
+    setStep2Result(result)
+    router.push('/video/create/step3')
+  }
+
+  const handleAutoScenesComplete = (scenes: AutoScene[]) => {
+    if (!selectedScriptStyle || !selectedTone) return
+    const finalAutoScript = scenes.map((scene) => scene.editedScript.trim()).join('\n\n')
+    const result = {
+      mode: 'auto' as const,
+      finalScript: finalAutoScript,
+      selectedImages: scenes.map((scene) => scene.imageUrl),
+      scenes,
+      draftVideo: '',
+    }
     setStep2Result(result)
     router.push('/video/create/step3')
   }
@@ -330,8 +335,8 @@ export default function Step2Page() {
               </motion.section>
             )}
 
-            {/* 3. 대본 생성 중 */}
-            {activeSteps.scriptGenerating && isGeneratingScript && (
+            {/* 3. 대본 생성 중 (manual) */}
+            {mode === 'manual' && activeSteps.scriptGenerating && isGeneratingScript && (
               <motion.section
                 ref={scriptGeneratingRef}
                 initial={{ opacity: 0, y: 20 }}
@@ -342,8 +347,8 @@ export default function Step2Page() {
               </motion.section>
             )}
 
-            {/* 4. 대본 편집 */}
-            {activeSteps.scriptEditing && (
+            {/* 4. 대본 편집 (manual) */}
+            {mode === 'manual' && activeSteps.scriptEditing && (
               <motion.section
                 ref={scriptEditingRef}
                 initial={{ opacity: 0, y: 20 }}
@@ -515,44 +520,19 @@ export default function Step2Page() {
               </motion.section>
             )}
 
-            {/* 7. 이미지 선택 (auto only) */}
-            {mode === 'auto' && activeSteps.imageSelection && (
+            {/* Auto mode integrated flow */}
+            {mode === 'auto' && selectedScriptStyle && selectedTone && (
               <motion.section
                 ref={imageSelectionRef}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
-                <div>
-                  <h2 className={`text-2xl font-bold mb-2 ${
-                    theme === 'dark' ? 'text-white' : 'text-gray-900'
-                  }`}>
-                    이미지 선택
-                  </h2>
-                  <p className={`mt-2 ${
-                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-                  }`}>
-                    영상에 사용할 이미지를 선택해주세요 (4~5장)
-                  </p>
-                </div>
-
-                <ImageSelectionPanel
-                  onSelectionChange={handleImageSelectionChange}
-                  minSelection={4}
-                  maxSelection={5}
+                <AutoModeSection
+                  conceptId={selectedScriptStyle}
+                  toneId={selectedTone}
+                  onComplete={handleAutoScenesComplete}
                 />
-
-                <div className="flex justify-end">
-                  <Button
-                    size="lg"
-                    onClick={handleGoToStep3}
-                    disabled={selectedImages.length < 4 || selectedImages.length > 5}
-                    className="gap-2"
-                  >
-                    다음 단계
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
-                </div>
               </motion.section>
             )}
 
