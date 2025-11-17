@@ -44,6 +44,7 @@ export default function AutoModeSection({
   const theme = useThemeStore((state) => state.theme)
   const [scenes, setScenes] = useState<AutoScene[]>([])
   const [isRegenerating, setIsRegenerating] = useState(false)
+  const [isSceneGenerating, setIsSceneGenerating] = useState(false)
   const [sceneStatuses, setSceneStatuses] = useState<Record<string, SceneStatus>>({})
   const timeoutRefs = useRef<Array<ReturnType<typeof setTimeout>>>([])
   const sceneBoardRef = useRef<HTMLDivElement>(null)
@@ -60,6 +61,18 @@ export default function AutoModeSection({
       timeoutRefs.current.forEach((id) => clearTimeout(id))
     }
   }, [])
+
+  useEffect(() => {
+    if (!isSceneGenerating) return
+    if (scenes.length === 0) {
+      setIsSceneGenerating(false)
+      return
+    }
+    const allReady = scenes.every((scene) => sceneStatuses[scene.id]?.state === 'ready')
+    if (allReady) {
+      setIsSceneGenerating(false)
+    }
+  }, [isSceneGenerating, scenes, sceneStatuses])
 
   const conceptLabel = useMemo(
     () => conceptOptions.find((option) => option.id === conceptId)?.label ?? '선택된 컨셉',
@@ -136,6 +149,8 @@ export default function AutoModeSection({
   }
 
   const handleConfirmAllScenes = () => {
+    if (scenes.length === 0) return
+    setIsSceneGenerating(true)
     scenes.forEach((scene) => {
       const status = sceneStatuses[scene.id]
       if (!status || status.state === 'idle') {
@@ -173,6 +188,7 @@ export default function AutoModeSection({
         onSelectAsset={handleSelectAsset}
         onRemoveScene={handleRemoveScene}
         onConfirmAllScenes={handleConfirmAllScenes}
+        isGenerating={isSceneGenerating}
       />
 
       <SceneScriptBoard
@@ -182,7 +198,6 @@ export default function AutoModeSection({
         isRegenerating={isRegenerating}
         minSelection={minScenes}
         sceneStatuses={sceneStatuses}
-        loadingStages={SCENE_LOADING_STEPS}
         onSceneChange={handleSceneChange}
         onRegenerateScripts={handleRegenerateScripts}
         onReorderScenes={(ids) => {
@@ -192,6 +207,7 @@ export default function AutoModeSection({
           })
         }}
         sectionRef={sceneBoardRef}
+        isGenerating={isSceneGenerating}
       />
 
       <div

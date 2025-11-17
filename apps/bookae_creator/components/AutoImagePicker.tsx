@@ -23,6 +23,7 @@ interface AutoImagePickerProps {
   onSelectAsset: (asset: CrawledImageAsset) => void
   onRemoveScene: (sceneId: string) => void
   onConfirmAllScenes: () => void
+  isGenerating?: boolean
 }
 
 export default function AutoImagePicker({
@@ -34,6 +35,7 @@ export default function AutoImagePicker({
   onSelectAsset,
   onRemoveScene,
   onConfirmAllScenes,
+  isGenerating = false,
 }: AutoImagePickerProps) {
   const theme = useThemeStore((state) => state.theme)
   const selectedAssetIds = useMemo(() => new Set(scenes.map((scene) => scene.assetId)), [scenes])
@@ -85,13 +87,23 @@ export default function AutoImagePicker({
             >
               {scenes.length} Scene
             </Badge>
-            <Button variant="outline" size="sm" disabled={idleSceneCount === 0} onClick={onConfirmAllScenes}>
-              이 사진들로 진행하기
-            </Button>
+            <div className="flex flex-col gap-1">
+              {isGenerating && (
+                <span className="text-xs font-semibold text-purple-500">AI가 대본을 생성중이에요...</span>
+              )}
+              <Button
+                size="sm"
+                disabled={idleSceneCount === 0 || isGenerating}
+                onClick={onConfirmAllScenes}
+                className={`bg-purple-600 text-white hover:bg-purple-500 disabled:bg-gray-500 disabled:text-white`}
+              >
+                대본 생성하기
+              </Button>
+            </div>
           </div>
         </div>
         <p className={`mt-2 text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-          버튼을 누르면 아직 분석하지 않은 장면에 대해 AI 추천 대본이 한 번에 생성돼요.
+          ‘대본 생성하기’ 버튼을 누르면 아직 분석하지 않은 장면에 대해 AI 추천 대본이 한 번에 생성돼요.
         </p>
       </div>
 

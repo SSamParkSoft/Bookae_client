@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import type { RefObject } from 'react'
-import { RefreshCw, GripVertical, Loader2 } from 'lucide-react'
+import { RefreshCw, GripVertical } from 'lucide-react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -27,11 +27,11 @@ interface SceneScriptBoardProps {
       stage: number
     }
   >
-  loadingStages: string[]
   onSceneChange: (sceneId: string, updates: Partial<AutoScene>) => void
   onRegenerateScripts: () => void
   onReorderScenes: (sceneIds: string[]) => void
   sectionRef?: RefObject<HTMLDivElement>
+  isGenerating?: boolean
 }
 
 export default function SceneScriptBoard({
@@ -41,11 +41,11 @@ export default function SceneScriptBoard({
   isRegenerating,
   minSelection = 4,
   sceneStatuses,
-  loadingStages,
   onSceneChange,
   onRegenerateScripts,
   onReorderScenes,
   sectionRef,
+  isGenerating = false,
 }: SceneScriptBoardProps) {
   const theme = useThemeStore((state) => state.theme)
   const canRenderScenes = scenes.length >= minSelection
@@ -94,15 +94,20 @@ export default function SceneScriptBoard({
             </Badge>
           </div>
         </div>
-        <Button
-          variant="outline"
-          onClick={onRegenerateScripts}
-          disabled={isRegenerating || !canRenderScenes}
-          className="gap-2 self-start md:self-auto"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
-          AI 추천 다시 받기
-        </Button>
+        <div className="flex flex-col gap-2 md:items-end">
+          {isGenerating && (
+            <span className="text-sm font-semibold text-purple-500">AI가 대본을 생성중이에요...</span>
+          )}
+          <Button
+            variant="outline"
+            onClick={onRegenerateScripts}
+            disabled={isRegenerating || !canRenderScenes}
+            className="gap-2 self-start md:self-auto"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+            AI 추천 다시 받기
+          </Button>
+        </div>
       </div>
 
       {!canRenderScenes && (
@@ -125,7 +130,6 @@ export default function SceneScriptBoard({
                   scene={scene}
                   index={index}
                   theme={theme}
-                  loadingStages={loadingStages}
                   sceneStatuses={sceneStatuses}
                   onSceneChange={onSceneChange}
                 />
@@ -142,14 +146,12 @@ function SortableSceneCard({
   scene,
   index,
   theme,
-  loadingStages,
   sceneStatuses,
   onSceneChange,
 }: {
   scene: AutoScene
   index: number
   theme: string
-  loadingStages: string[]
   sceneStatuses: SceneScriptBoardProps['sceneStatuses']
   onSceneChange: SceneScriptBoardProps['onSceneChange']
 }) {
@@ -168,7 +170,7 @@ function SortableSceneCard({
     <Card
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : ''} ${
+      className={`${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-200 bg-white'} ${
         isDragging ? 'ring-2 ring-purple-400 shadow-lg' : ''
       }`}
     >
@@ -192,7 +194,7 @@ function SortableSceneCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-[160px_1fr]">
-          <div className="overflow-hidden rounded-xl border">
+          <div className={`overflow-hidden rounded-xl border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
             <img src={scene.imageUrl} alt={scene.imageLabel} className="h-full w-full object-cover" />
           </div>
           {status?.state === 'ready' ? (
@@ -225,23 +227,7 @@ function SortableSceneCard({
                 theme === 'dark' ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-600'
               }`}
             >
-              <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-              <p className="text-sm font-semibold">
-                {status?.state === 'loading'
-                  ? loadingStages[status.stage] ?? loadingStages[loadingStages.length - 1]
-                  : '이 사진들로 진행하기 버튼을 눌러주세요'}
-              </p>
-              {status?.state === 'loading' && (
-                <div className="w-full">
-                  <div className={`h-2 rounded-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'}`}>
-                    <div
-                      className="h-full rounded-full bg-purple-500 transition-all"
-                      style={{ width: `${status.progress ?? 0}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-purple-400">{Math.round(status.progress ?? 0)}% 완료</p>
-                </div>
-              )}
+              <p className="text-sm font-semibold text-purple-500">대본 생성하기 버튼을 눌러주세요</p>
             </div>
           )}
         </div>
