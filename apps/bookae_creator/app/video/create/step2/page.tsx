@@ -42,6 +42,10 @@ export default function Step2Page() {
       imageSelection: false, // auto only
   })
 
+  const showNextStepCue =
+    (mode === 'manual' && activeSteps.shootingGuide) ||
+    (mode === 'auto' && activeSteps.imageSelection)
+
   // 섹션 refs
   const scriptStyleRef = useRef<HTMLDivElement>(null)
   const scriptGeneratingRef = useRef<HTMLDivElement>(null)
@@ -411,7 +415,7 @@ export default function Step2Page() {
                   </Button>
                 </div>
 
-                {((mode === 'manual' && activeSteps.shootingGuide) || (mode === 'auto' && activeSteps.imageSelection)) && (
+                {showNextStepCue && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
