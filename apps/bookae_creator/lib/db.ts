@@ -6,17 +6,29 @@ import type { MediaAsset } from '@/lib/types/media'
 
 const resolveDemoDbPath = () => {
   const cwd = process.cwd()
+  
+  // 다양한 가능한 경로들
   const candidates = [
-    // 모노레포 루트에서 실행되는 경우
+    // 현재 작업 디렉토리 기준 (프로덕션 실행 시)
     path.join(cwd, 'apps', 'bookae_creator', 'data', 'demo.db'),
-    // 앱 디렉토리에서 직접 실행되는 경우
     path.join(cwd, 'data', 'demo.db'),
+    // .next/server 내부 (프로덕션 빌드)
+    path.join(cwd, '.next', 'server', 'apps', 'bookae_creator', 'data', 'demo.db'),
+    path.join(cwd, '.next', 'server', 'data', 'demo.db'),
+    // standalone 모드
+    path.join(cwd, '.next', 'standalone', 'apps', 'bookae_creator', 'data', 'demo.db'),
     // 절대 경로로도 시도
     path.resolve(cwd, 'apps', 'bookae_creator', 'data', 'demo.db'),
     path.resolve(cwd, 'data', 'demo.db'),
+    // 프로덕션에서 __dirname 기준 (컴파일된 파일 위치)
+    path.resolve(__dirname, '..', 'data', 'demo.db'),
+    path.resolve(__dirname, '..', '..', 'data', 'demo.db'),
+    // 모노레포 루트에서 실행되는 경우
+    path.resolve(cwd, 'apps', 'bookae_creator', 'data', 'demo.db'),
   ]
 
   console.log('[db] process.cwd():', cwd)
+  console.log('[db] __dirname:', __dirname)
   console.log('[db] 후보 경로들:', candidates)
 
   for (const candidate of candidates) {
