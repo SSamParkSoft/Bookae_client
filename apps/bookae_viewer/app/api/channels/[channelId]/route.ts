@@ -6,7 +6,6 @@ const DUMMY_CHANNELS: Record<string, ChannelInfo> = {
   ssambak: {
     id: 'ssambak',
     name: '쌈박한 소프트',
-    profileImage: 'https://via.placeholder.com/200/06b6d4/ffffff?text=쌈박한소프트',
     description: '가성비 좋은 제품을 찾아드립니다',
     youtubeChannelId: 'UC1234567890',
     youtubeChannelName: 'ssambak',
