@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Share2, Mail } from 'lucide-react'
 import { ChannelInfo } from '@/lib/types/viewer'
 
@@ -8,6 +9,7 @@ interface ChannelProfileProps {
 }
 
 export default function ChannelProfile({ channel }: ChannelProfileProps) {
+  const [imageError, setImageError] = useState(false)
   const handleShare = async () => {
     const url = window.location.href
     if (navigator.share) {
@@ -55,16 +57,19 @@ export default function ChannelProfile({ channel }: ChannelProfileProps) {
 
         {/* 프로필 이미지 */}
         <div className="w-24 h-24 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center ring-2 ring-purple-200">
-          {channel.profileImage ? (
+          {channel.profileImage && !imageError ? (
             <img
               src={channel.profileImage}
               alt={channel.name}
               className="w-full h-full object-cover"
+              onError={() => setImageError(true)}
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-purple-300 to-purple-400 flex items-center justify-center text-white text-2xl font-bold">
-              {channel.name.charAt(0)}
-            </div>
+            <img
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(channel.name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`}
+              alt={channel.name}
+              className="w-full h-full object-cover"
+            />
           )}
         </div>
 
