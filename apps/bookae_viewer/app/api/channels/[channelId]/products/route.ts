@@ -26,7 +26,7 @@ const generateDummyProducts = (channelId: string): Product[] => {
     { name: '어묵탕 600g', price: 8500, color: '06b6d4', desc: '시원한 어묵탕', text: '어묵탕' },
     { name: '닭볶음탕 1kg', price: 18900, color: 'f59e0b', desc: '매콤달콤 닭볶음탕', text: '닭볶음탕' },
     { name: '보쌈 정식 1kg', price: 22900, color: '10b981', desc: '부드러운 보쌈', text: '보쌈' },
-    { name: '족발 1kg', price: 29900, color: 'dc2626', desc: '쫄깃한 족발', text: '족발' },
+    { name: '스파알 포터블 목 어깨 마사지기', price: 159000, color: '8b5cf6', desc: '6개의 손맛 헤드로 목·어깨를 시원하게 풀어주는 프리미엄 마사지기', text: '스파알', isSpael: true },
     { name: '양념치킨 1kg', price: 17900, color: 'f97316', desc: '달콤한 양념치킨', text: '양념치킨' },
     { name: '후라이드치킨 1kg', price: 16900, color: 'f59e0b', desc: '바삭한 후라이드', text: '후라이드' },
     { name: '떡갈비 500g', price: 14900, color: 'ef4444', desc: '부드러운 떡갈비', text: '떡갈비' },
@@ -56,7 +56,23 @@ const generateDummyProducts = (channelId: string): Product[] => {
     { name: '고추장아찌 300g', price: 6900, color: 'ef4444', desc: '아삭한 고추장아찌', text: '고추' },
   ]
 
-  const products: Product[] = productTemplates.map((template, index) => ({
+  // 제품 목록 생성
+  const products: Product[] = productTemplates.map((template, index) => {
+    // 23번째 제품(인덱스 22)은 스파알 제품
+    if ((template as any).isSpael) {
+      return {
+        id: 'spael-neck-massager',
+        productId: 23,
+        name: template.name,
+        price: template.price,
+        image: '/media/num1.png',
+        thumbnailUrl: '/media/num1.png',
+        description: template.desc,
+        order: index + 1,
+      }
+    }
+    
+    return {
     id: String(index + 1),
     productId: 1234567 + index,
     name: template.name,
@@ -65,7 +81,8 @@ const generateDummyProducts = (channelId: string): Product[] => {
     thumbnailUrl: `https://via.placeholder.com/200/${template.color}/ffffff?text=${encodeURIComponent(template.text)}`,
     description: template.desc,
     order: index + 1,
-  }))
+    }
+  })
 
   return products
 }
@@ -82,15 +99,23 @@ export async function GET(
     // 제품 목록 생성 (추후 실제 API 연동)
     let products = generateDummyProducts(channelId)
 
-    // 검색 필터링
+    // 검색 필터링 (제목 또는 배지 번호로만 검색)
     if (search) {
       const searchLower = search.toLowerCase()
+      const searchNumber = parseInt(search, 10)
+      const isNumericSearch = !isNaN(searchNumber) && search.trim() !== ''
+      
       products = products.filter(
         (p) =>
+          // 제품명(제목) 검색
           p.name.toLowerCase().includes(searchLower) ||
-          p.description?.toLowerCase().includes(searchLower)
+          // 배지에 표시되는 order 번호로만 검색 (정확히 일치)
+          (isNumericSearch && p.order === searchNumber)
       )
     }
+
+    // order 기준으로 정렬 (검색 후에도 정렬 유지)
+    products.sort((a, b) => a.order - b.order)
 
     return NextResponse.json(products, {
       headers: {
