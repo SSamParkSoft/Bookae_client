@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Image, Mic, Type, Music, Shuffle, Play, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -17,8 +17,6 @@ import BgmSelectionDialog from '@/components/BgmSelectionDialog'
 import TransitionEffectDialog from '@/components/TransitionEffectDialog'
 import PriceInfoToggle from '@/components/PriceInfoToggle'
 import IntroSelectionDialog from '@/components/IntroSelectionDialog'
-import { useCreateStudioJob, useStudioJob } from '@/lib/hooks/useStudio'
-import type { StudioJobStatus } from '@/lib/types/api/video'
 
 export default function Step3Page() {
   const router = useRouter()
@@ -27,26 +25,9 @@ export default function Step3Page() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null)
-  const [jobId, setJobId] = useState<string | null>(null)
   const effectsSectionRef = useRef<HTMLDivElement>(null)
   const videoGeneratingRef = useRef<HTMLDivElement>(null)
   const finalVideoRef = useRef<HTMLDivElement>(null)
-
-  const createStudioJobMutation = useCreateStudioJob()
-  const { data: studioJob, isLoading: isLoadingJobStatus } = useStudioJob(
-    jobId,
-    {
-      enabled: !!jobId && isGeneratingVideo,
-      refetchInterval: (data) => {
-        // 작업이 완료되거나 실패하면 폴링 중지
-        if (data?.status === 'COMPLETED' || data?.status === 'FAILED') {
-          return false
-        }
-        // 진행 중이면 2초마다 폴링
-        return 2000
-      },
-    }
-  )
 
   // 효과 선택 완료 여부 체크
   const checkEffectsComplete = () => {
@@ -65,66 +46,22 @@ export default function Step3Page() {
     setIsGeneratingVideo(true)
     setGenerationProgress(0)
     setFinalVideoUrl(null)
-    setJobId(null)
 
     // 스크롤
     setTimeout(() => {
       videoGeneratingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
 
-    try {
-      // step2Result에서 imageScriptPairs 생성
-      const imageScriptPairs = step2Result.scenes?.map((scene) => ({
-        imageUrl: scene.imageUrl,
-        script: scene.editedScript || scene.recommendedScript,
-      })) || []
-
-      if (imageScriptPairs.length === 0) {
-        throw new Error('이미지와 스크립트 정보가 없습니다.')
-      }
-
-      // API 호출
-      const job = await createStudioJobMutation.mutateAsync({
-        productId: selectedProducts[0].id,
-        jobType: 'AUTO_CREATE_VIDEO_FROM_DATA',
-        imageScriptPairs,
-      })
-
-      setJobId(job.id)
-    } catch (error) {
-      console.error('영상 생성 요청 실패:', error)
-      alert('영상 생성 요청에 실패했습니다. 서버가 실행 중인지 확인해주세요.')
+    // 2초 후에 완성된 영상 제공 (데모용)
+    setTimeout(() => {
+      setGenerationProgress(100)
       setIsGeneratingVideo(false)
-      setGenerationProgress(0)
-    }
-  }
-
-  // 작업 상태에 따른 진행률 및 비디오 URL 업데이트
-  useEffect(() => {
-    if (!studioJob) return
-
-    const statusToProgress: Record<StudioJobStatus, number> = {
-      PENDING: 10,
-      PROCESSING: 50,
-      COMPLETED: 100,
-      FAILED: 0,
-    }
-
-    setGenerationProgress(statusToProgress[studioJob.status] || 0)
-
-    if (studioJob.status === 'COMPLETED') {
-      // 작업 완료 시 비디오 URL 설정 (실제로는 Video API에서 가져와야 함)
-      // 임시로 progressDetail이나 다른 필드에서 URL을 가져올 수 있다면 사용
-      setIsGeneratingVideo(false)
-      // 최종 영상 섹션으로 스크롤
+      setFinalVideoUrl('/media/Scenario_video.mp4')
       setTimeout(() => {
         finalVideoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 100)
-    } else if (studioJob.status === 'FAILED') {
-      setIsGeneratingVideo(false)
-      alert(`영상 생성 실패: ${studioJob.errorMessage || '알 수 없는 오류'}`)
-    }
-  }, [studioJob])
+    }, 2000)
+  }
 
   // 효과 수정하기 (효과 섹션으로 즉시 스크롤)
   const handleEditEffects = () => {
@@ -424,13 +361,6 @@ export default function Step3Page() {
                       theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
                     }`}>
                       <div className="space-y-3 text-left">
-                        {studioJob?.progressDetail && (
-                          <div className={`text-sm mb-3 ${
-                            theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
-                            {studioJob.progressDetail}
-                          </div>
-                        )}
                         <motion.div
                           className={`flex items-center gap-3 transition-all ${
                             generationProgress >= 30 ? 'opacity-100' : 'opacity-50'
