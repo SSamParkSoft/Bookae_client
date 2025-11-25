@@ -256,40 +256,51 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.4 }}
+                className="h-full"
               >
-                <Card 
-                  className={`h-full border border-gray-200 cursor-pointer transition-all hover:shadow-lg ${
+                <div
+                  className={`h-full rounded-lg p-[2px] cursor-pointer transition-all shadow-sm hover:shadow-md hover:scale-90 animate-purple-glow ${
                     theme === 'dark' 
-                      ? 'hover:bg-purple-900/30' 
-                      : 'hover:bg-purple-50'
+                      ? 'bg-gradient-to-br from-purple-600/80 to-purple-400/20 hover:from-purple-400/70 hover:to-purple-500/70' 
+                      : 'bg-gradient-to-br from-purple-200/20 to-purple-400/80 hover:from-purple-200/70 hover:to-purple-300/70'
                   }`}
                   onClick={() => router.push('/video/create')}
                 >
-                  <CardHeader className="h-full flex flex-col justify-center">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                        theme === 'dark' 
-                          ? 'bg-purple-600' 
-                          : 'bg-purple-600'
-                      }`}>
-                        <Video className="w-8 h-8 text-white" />
-                      </div>
-                      <div className="text-center">
-                        <CardTitle className={`text-xl font-bold mb-2 ${
-                          theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  <Card 
+                    className={`h-full border-0 cursor-pointer transition-all rounded-lg ${
+                      theme === 'dark' 
+                        ? 'bg-gradient-to-br from-purple-500/70 to-purple-300/10 hover:from-purple-400/60 hover:to-purple-500/60' 
+                        : 'bg-gradient-to-br from-purple-300/10 to-purple-400/70 hover:from-purple-200/60 hover:to-purple-300/60'
+                    }`}
+                  >
+                    <CardHeader className="h-full flex flex-col justify-center">
+                      <div className="flex flex-col items-center gap-5">
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
+                          theme === 'dark' 
+                            ? 'bg-white/30 backdrop-blur-sm' 
+                            : 'bg-white/40 backdrop-blur-sm'
                         }`}>
-                          영상 만들러가기
-                        </CardTitle>
-                        <div className={`flex items-center justify-center gap-2 text-sm ${
-                          theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
-                        }`}>
-                          <span>시작하기</span>
-                          <ArrowRight className="w-4 h-4" />
+                          <Video className={`w-10 h-10 ${
+                            theme === 'dark' ? 'text-purple-900' : 'text-purple-700'
+                          }`} />
+                        </div>
+                        <div className="text-center">
+                          <CardTitle className={`text-2xl font-bold mb-3 text-white/90 ${
+                            theme === 'dark' ? 'text-white/90' : 'text-gray-900'
+                          }`}>
+                            영상 제작하기
+                          </CardTitle>
+                          <div className={`flex items-center justify-center gap-2 text-base font-semibold ${
+                            theme === 'dark' ? 'text-white/90' : 'text-gray-900'
+                          }`}>
+                            <span>바로 시작</span>
+                            <ArrowRight className="w-5 h-5" />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                </Card>
+                    </CardHeader>
+                  </Card>
+                </div>
               </motion.div>
             </div>
 

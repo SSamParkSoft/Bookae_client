@@ -35,11 +35,7 @@ export default function ChannelProfile({ channel }: ChannelProfileProps) {
   }
 
   const handleBusinessProposal = () => {
-    if (channel.businessEmail) {
-      window.location.href = `mailto:${channel.businessEmail}?subject=비즈니스 제안`
-    } else {
-      alert('비즈니스 제안 이메일이 설정되지 않았습니다.')
-    }
+    window.location.href = `mailto:ssamso8282@gmail.com?subject=비즈니스 제안`
   }
 
   return (

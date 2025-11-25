@@ -12,8 +12,6 @@ import { useUserStore } from '@/store/useUserStore'
 import { useThemeStore } from '@/store/useThemeStore'
 import { useYouTubeVideos } from '@/lib/hooks/useYouTubeVideos'
 import PageHeader from '@/components/PageHeader'
-import { useCoupangStats } from '@/lib/hooks/useCoupangStats'
-import { useYouTubeStats } from '@/lib/hooks/useYouTubeStats'
 import {
   User,
   Mail,
@@ -23,10 +21,8 @@ import {
   Link2Off,
   Youtube,
   ShoppingCart,
-  Video,
   Bell,
   Eye,
-  DollarSign,
   Edit2,
   Upload,
   Download,
@@ -55,19 +51,10 @@ const formatNumber = (num: number): string => {
   return num.toString()
 }
 
-const formatCurrency = (num: number): string => {
-  return new Intl.NumberFormat('ko-KR', {
-    style: 'currency',
-    currency: 'KRW',
-  }).format(num)
-}
-
 export default function ProfilePage() {
   const theme = useThemeStore((state) => state.theme)
   const { user, connectedServices, notificationSettings, updateUser, setConnectedService, updateNotificationSettings } = useUserStore()
   const { data: youtubeVideos, isLoading: youtubeLoading } = useYouTubeVideos()
-  const { data: coupangData } = useCoupangStats()
-  const { data: youtubeStats } = useYouTubeStats()
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
@@ -76,11 +63,6 @@ export default function ProfilePage() {
     name: user?.name || '',
     email: user?.email || '',
   })
-
-  // 통계 계산
-  const totalVideos = youtubeVideos?.length || 0
-  const totalViews = youtubeStats?.views || 0
-  const totalRevenue = (coupangData?.dailyRevenue.reduce((sum, item) => sum + item.commission, 0) || 0) + (youtubeStats?.totalEstimatedRevenue || 0)
 
   // 최근 영상 목록 (최대 5개)
   const recentVideos = youtubeVideos?.slice(0, 5) || []
@@ -265,78 +247,6 @@ export default function ProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* 통계 요약 카드 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Video className={`w-5 h-5 ${
-                        theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                      }`} />
-                      <CardTitle className="text-lg">총 영상 수</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className={`text-3xl font-bold ${
-                      theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
-                    }`}>
-                      {totalVideos}
-                    </p>
-                    <p className={`text-sm mt-1 ${
-                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
-                      제작한 영상
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Eye className={`w-5 h-5 ${
-                        theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                      }`} />
-                      <CardTitle className="text-lg">총 조회수</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className={`text-3xl font-bold ${
-                      theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
-                    }`}>
-                      {formatNumber(totalViews)}
-                    </p>
-                    <p className={`text-sm mt-1 ${
-                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
-                      누적 조회수
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className={`w-5 h-5 ${
-                        theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                      }`} />
-                      <CardTitle className="text-lg">총 수익</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className={`text-3xl font-bold ${
-                      theme === 'dark' ? 'text-purple-300' : 'text-purple-600'
-                    }`}>
-                      {formatCurrency(totalRevenue)}
-                    </p>
-                    <p className={`text-sm mt-1 ${
-                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
-                      누적 수익
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           </TabsContent>
 
