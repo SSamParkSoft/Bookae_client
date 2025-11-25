@@ -8,10 +8,18 @@ export async function generateMetadata({
   const { channelId } = await params
   const title = `${channelId}_bookae`
 
-  return {
+  const metadata: Metadata = {
     title,
     description: `${channelId}의 미니홈페이지`,
   }
+
+  if (channelId === 'ssambak') {
+    metadata.verification = {
+      google: 'X9h-6p24GJIq-mjk4cArLR3r3WMUDuX8jgWdbkpBClQ',
+    }
+  }
+
+  return metadata
 }
 
 export default function ChannelLayout({
