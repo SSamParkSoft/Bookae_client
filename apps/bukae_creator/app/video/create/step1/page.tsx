@@ -551,21 +551,6 @@ export default function Step1Page() {
             )}
           </div>
 
-          {/* 다음 단계 버튼 */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleNext}
-              disabled={selectedProducts.length === 0}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-                selectedProducts.length === 0
-                  ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-                  : 'bg-purple-500 hover:bg-purple-600 text-white'
-              }`}
-            >
-              <span>다음 단계</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-          </div>
           </div>
         </div>
       </div>
