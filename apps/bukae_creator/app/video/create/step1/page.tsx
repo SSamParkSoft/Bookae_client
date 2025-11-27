@@ -12,6 +12,8 @@ import { SPAEL_PRODUCT, isSpaelProduct } from '@/lib/data/spaelProduct'
 import { useProducts } from '@/lib/hooks/useProducts'
 import { transformProductResponseToProduct } from '@/lib/utils/product-transform'
 
+type ThemeMode = 'light' | 'dark'
+
 // 인기 제품 더미 데이터
 const popularProducts = [
   { id: 'pop1', name: '무선 이어폰', views: 12500, rank: 1 },
@@ -20,6 +22,71 @@ const popularProducts = [
   { id: 'pop4', name: '노트북 스탠드', views: 7200, rank: 4 },
   { id: 'pop5', name: '무선 마우스', views: 6500, rank: 5 },
 ]
+
+interface PopularProductsCardProps {
+  theme: ThemeMode
+  className?: string
+}
+
+const PopularProductsCard = ({ theme, className = '' }: PopularProductsCardProps) => {
+  const containerStyle =
+    theme === 'dark'
+      ? 'bg-gray-800 border-gray-700'
+      : 'bg-white border-gray-200'
+  const badgeStyle =
+    theme === 'dark'
+      ? 'text-white'
+      : 'text-gray-900'
+  const subTextStyle =
+    theme === 'dark'
+      ? 'text-gray-400'
+      : 'text-gray-500'
+  const iconColor =
+    theme === 'dark'
+      ? 'text-purple-400'
+      : 'text-purple-600'
+
+  return (
+    <div className={`rounded-lg shadow-sm border p-6 ${containerStyle} ${className}`}>
+      <div className="flex items-center gap-2 mb-4">
+        <TrendingUp className={`w-5 h-5 ${iconColor}`} />
+        <h2 className={`text-xl font-semibold ${badgeStyle}`}>
+          인기 제품 순위
+        </h2>
+      </div>
+      <div className="space-y-3">
+        {popularProducts.map((product) => (
+          <div
+            key={product.id}
+            className={`flex items-center justify-between p-3 rounded-lg ${
+              theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                  product.rank <= 3
+                    ? 'bg-purple-500 text-white'
+                    : theme === 'dark'
+                      ? 'bg-gray-700 text-gray-300'
+                      : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {product.rank}
+              </div>
+              <span className={badgeStyle}>
+                {product.name}
+              </span>
+            </div>
+            <span className={`text-sm ${subTextStyle}`}>
+              {product.views.toLocaleString()}회
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // 더미 데이터 생성 함수
 const generateProducts = (platform: Platform, count: number): Product[] => {
@@ -209,11 +276,29 @@ export default function Step1Page() {
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      products = products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query) ||
-          p.description?.toLowerCase().includes(query)
-      )
+      const relevanceScore = (text: string | undefined) => {
+        if (!text) return Number.MAX_SAFE_INTEGER
+        const index = text.toLowerCase().indexOf(query)
+        return index === -1 ? Number.MAX_SAFE_INTEGER : index
+      }
+
+      products = products
+        .filter(
+          (p) =>
+            p.name.toLowerCase().includes(query) ||
+            p.description?.toLowerCase().includes(query)
+        )
+        .sort((a, b) => {
+          const aScore = Math.min(
+            relevanceScore(a.name),
+            relevanceScore(a.description)
+          )
+          const bScore = Math.min(
+            relevanceScore(b.name),
+            relevanceScore(b.description)
+          )
+          return aScore - bScore
+        })
     }
 
     // 스파알 제품을 맨 앞으로 이동
@@ -351,53 +436,8 @@ export default function Step1Page() {
             </div>
           </div>
 
-          {/* 인기 제품 순위 */}
-          <div className={`mb-8 rounded-lg shadow-sm border p-6 ${
-            theme === 'dark'
-              ? 'bg-gray-800 border-gray-700'
-              : 'bg-white border-gray-200'
-          }`}>
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className={`w-5 h-5 ${
-                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-              }`} />
-              <h2 className={`text-xl font-semibold ${
-                theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}>
-                인기 제품 순위
-              </h2>
-            </div>
-            <div className="space-y-3">
-              {popularProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                      product.rank <= 3
-                        ? 'bg-purple-500 text-white'
-                        : theme === 'dark'
-                          ? 'bg-gray-700 text-gray-300'
-                          : 'bg-gray-200 text-gray-600'
-                    }`}>
-                      {product.rank}
-                    </div>
-                    <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                      {product.name}
-                    </span>
-                  </div>
-                  <span className={`text-sm ${
-                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                  }`}>
-                    {product.views.toLocaleString()}회
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* 인기 제품 순위 - 모바일 뷰 */}
+          <PopularProductsCard theme={theme} className="mb-8 lg:hidden" />
 
           {/* 서버 연결 오류 알림 */}
           {useDummyData && (
@@ -529,26 +569,14 @@ export default function Step1Page() {
             )}
           </div>
 
-          {/* 다음 단계 버튼 */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleNext}
-              disabled={selectedProducts.length === 0}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-                selectedProducts.length === 0
-                  ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-                  : 'bg-purple-500 hover:bg-purple-600 text-white'
-              }`}
-            >
-              <span>다음 단계</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-          </div>
           </div>
         </div>
       </div>
       <div className="hidden lg:block p-4 md:p-8 flex-shrink-0">
-        <SelectedProductsPanel />
+        <div className="sticky top-8 flex flex-col gap-6 w-72 xl:w-80">
+          <SelectedProductsPanel />
+          <PopularProductsCard theme={theme} />
+        </div>
       </div>
     </motion.div>
   )

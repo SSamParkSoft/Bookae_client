@@ -84,8 +84,34 @@ export default function Step2Page() {
     setExpandedConceptId((prev) => (prev === conceptId ? null : conceptId))
   }
 
+  const resetScriptSelectionState = () => {
+    setSelectedScriptStyle(null)
+    setSelectedTone(null)
+    setConcept(null)
+    setTone(null)
+    setGeneratedScript('')
+    setFinalScript('')
+    setExpandedConceptId(null)
+    setIsGeneratingScript(false)
+    setActiveSteps((prev) => ({
+      ...prev,
+      scriptGenerating: false,
+      scriptEditing: false,
+      shootingGuide: false,
+      videoUpload: false,
+      imageSelection: false,
+    }))
+  }
+
   // 대본 스타일 선택
   const handleScriptStyleSelect = (concept: ConceptType, toneId: string) => {
+    const isSameSelection = selectedScriptStyle === concept && selectedTone === toneId
+
+    if (isSameSelection) {
+      resetScriptSelectionState()
+      return
+    }
+
     setSelectedScriptStyle(concept)
     setSelectedTone(toneId)
     setConcept(concept)
@@ -325,10 +351,23 @@ export default function Step2Page() {
                   {conceptOptions.map((conceptOption) => {
                     const tones = conceptTones[conceptOption.id]
                     const toneTiers = Array.from(new Set(tones.map((tone) => tone.tier)))
+                    const isConceptSelected = selectedScriptStyle === conceptOption.id
+                    const isDimmed = selectedScriptStyle !== null && !isConceptSelected
+                    const selectedToneLabel =
+                      isConceptSelected
+                        ? tones.find((tone) => tone.id === selectedTone)?.label
+                        : null
+                    const cardBaseClass =
+                      theme === 'dark'
+                        ? 'bg-gray-800 border-gray-700'
+                        : 'bg-white border-gray-200'
                     return (
                       <Card
                         key={conceptOption.id}
-                        className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}
+                        aria-disabled={isDimmed || undefined}
+                        className={`transition-all ${
+                          cardBaseClass
+                        } ${isDimmed ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
                       >
                         <CardHeader
                           onClick={() => handleConceptToggle(conceptOption.id)}
@@ -347,6 +386,11 @@ export default function Step2Page() {
                                   </Badge>
                                 ))}
                               </div>
+                              {selectedToneLabel && (
+                                <p className="mt-2 text-sm text-teal-500">
+                                  선택된 스타일: {selectedToneLabel}
+                                </p>
+                              )}
                             </div>
                             <ChevronDown
                               className={`w-5 h-5 transition-transform ${

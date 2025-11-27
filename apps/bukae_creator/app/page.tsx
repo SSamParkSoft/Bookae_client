@@ -220,7 +220,7 @@ export default function HomePage() {
                     <p className={`text-sm mt-1 ${
                       theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
                     }`}>
-                      쿠팡 수익
+                      파트너스 수익
                     </p>
                     <p className={`text-xs mt-1 ${
                       theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
@@ -255,7 +255,7 @@ export default function HomePage() {
                     <p className={`text-sm mt-1 ${
                       theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
                     }`}>
-                      유튜브 수익
+                      영상플랫폼 수익
                     </p>
                     <p className={`text-xs mt-1 ${
                       theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
