@@ -276,11 +276,29 @@ export default function Step1Page() {
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      products = products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query) ||
-          p.description?.toLowerCase().includes(query)
-      )
+      const relevanceScore = (text: string | undefined) => {
+        if (!text) return Number.MAX_SAFE_INTEGER
+        const index = text.toLowerCase().indexOf(query)
+        return index === -1 ? Number.MAX_SAFE_INTEGER : index
+      }
+
+      products = products
+        .filter(
+          (p) =>
+            p.name.toLowerCase().includes(query) ||
+            p.description?.toLowerCase().includes(query)
+        )
+        .sort((a, b) => {
+          const aScore = Math.min(
+            relevanceScore(a.name),
+            relevanceScore(a.description)
+          )
+          const bScore = Math.min(
+            relevanceScore(b.name),
+            relevanceScore(b.description)
+          )
+          return aScore - bScore
+        })
     }
 
     // 스파알 제품을 맨 앞으로 이동
