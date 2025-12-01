@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ArrowRight, GripVertical, X, Loader2, CheckCircle2, Edit2, Sparkles } from 'lucide-react'
@@ -79,8 +79,9 @@ export default function Step3Page() {
   const [generatingScenes, setGeneratingScenes] = useState<Set<number>>(new Set())
   const [sceneScripts, setSceneScripts] = useState<Map<number, SceneScript>>(new Map())
   const [isGeneratingAll, setIsGeneratingAll] = useState(false)
-  const [editingSceneId, setEditingSceneId] = useState<number | null>(null)
+  const [editingSceneId, setEditingSceneId] = useState<number | null>(null) // TODO: 추후 구간별 편집 모드에 활용 가능
   const [editedScripts, setEditedScripts] = useState<Map<number, string>>(new Map())
+  const selectedListRef = useRef<HTMLDivElement | null>(null)
 
   // 이미지별 대본 생성 (단일 이미지용 - 현재는 일괄 생성에서만 사용)
   const generateScriptForImage = async (imageUrl: string, sceneIndex: number) => {
@@ -118,6 +119,7 @@ export default function Step3Page() {
           sceneId: sceneIndex + 1,
           script: data.scenes[0].script,
           imageUrl: imageUrl,
+          isAiGenerated: true,
         }
         
         setSceneScripts((prev) => {
@@ -187,10 +189,18 @@ export default function Step3Page() {
             sceneId: index + 1,
             script: sceneData?.script || '생성된 대본이 없습니다.',
             imageUrl,
+            isAiGenerated: !!sceneData?.script,
           })
         })
         return newMap
       })
+
+      // 생성된 스크립트 섹션으로 스크롤
+      setTimeout(() => {
+        if (selectedListRef.current) {
+          selectedListRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 100)
     } catch (error) {
       console.error('대본 일괄 생성 오류:', error)
       alert('대본 일괄 생성 중 오류가 발생했습니다.')
@@ -276,35 +286,49 @@ export default function Step3Page() {
     setDraggedIndex(null)
   }
 
-  // 대본 수정
+  // 대본 수정 (입력 값은 즉시 내부 상태에 반영)
   const handleScriptEdit = (sceneIndex: number, newScript: string) => {
     setEditedScripts((prev) => {
       const newMap = new Map(prev)
       newMap.set(sceneIndex, newScript)
       return newMap
     })
+
+    // sceneScripts에도 바로 반영하여 handleNext 시 반영되도록
+    setSceneScripts((prev) => {
+      const newMap = new Map(prev)
+      const existing = newMap.get(sceneIndex)
+      const imageUrl = selectedImages[sceneIndex]
+
+      if (existing) {
+        existing.script = newScript
+        // 사용자가 직접 수정한 경우 AI 생성 플래그 제거
+        if (existing.isAiGenerated) {
+          existing.isAiGenerated = false
+        }
+        newMap.set(sceneIndex, existing)
+      } else if (imageUrl) {
+        newMap.set(sceneIndex, {
+          sceneId: sceneIndex + 1,
+          script: newScript,
+          imageUrl,
+          isAiGenerated: false,
+        })
+      }
+
+      return newMap
+    })
   }
 
-  // 대본 저장
+  // 대본 저장 (명시적으로 저장 버튼을 눌렀을 때 호출)
   const handleScriptSave = (sceneIndex: number) => {
-    const editedScript = editedScripts.get(sceneIndex)
-    if (editedScript) {
-      setSceneScripts((prev) => {
-        const newMap = new Map(prev)
-        const script = newMap.get(sceneIndex)
-        if (script) {
-          script.script = editedScript
-          newMap.set(sceneIndex, script)
-        }
-        return newMap
-      })
-      setEditedScripts((prev) => {
-        const newMap = new Map(prev)
-        newMap.delete(sceneIndex)
-        return newMap
-      })
-    }
-    setEditingSceneId(null)
+    // 현재 구현에서는 입력 시점에 이미 sceneScripts에 반영되고 있으므로
+    // 여기서는 별도의 추가 로직 없이 편집 상태만 정리
+    setEditedScripts((prev) => {
+      const newMap = new Map(prev)
+      newMap.delete(sceneIndex)
+      return newMap
+    })
   }
 
   // 다음 단계로 이동
@@ -370,7 +394,7 @@ export default function Step3Page() {
                   disabled={isGeneratingAll}
                 >
                   <Sparkles className="w-4 h-4" />
-                  {isGeneratingAll ? 'AI 스크립트 생성 중...' : 'AI 스크립트 전체 생성'}
+                  {isGeneratingAll ? 'AI 스크립트 생성 중...' : 'AI 스크립트 생성'}
                 </Button>
               </div>
             )}
@@ -432,7 +456,10 @@ export default function Step3Page() {
 
             {/* 선택된 이미지 목록 (드래그 앤 드롭) - 사용 가능한 이미지 아래로 이동 */}
             {selectedImages.length > 0 && (
-              <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
+              <Card
+                ref={selectedListRef}
+                className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}
+              >
                 <CardHeader>
                   <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
                     선택된 이미지 및 대본 ({selectedImages.length}장)
@@ -443,8 +470,7 @@ export default function Step3Page() {
                     {selectedImages.map((imageUrl, index) => {
                       const script = sceneScripts.get(index)
                       const isGenerating = generatingScenes.has(index)
-                      const isEditing = editingSceneId === index
-                      const editedScript = editedScripts.get(index) || script?.script || ''
+                      const editedScript = editedScripts.get(index) ?? script?.script ?? ''
                       
                       return (
                         <div
@@ -485,7 +511,7 @@ export default function Step3Page() {
                                 <p className={`text-sm font-medium ${
                                   theme === 'dark' ? 'text-white' : 'text-gray-900'
                                 }`}>
-                                  씬 {index + 1}
+                                  Scene {index + 1}
                                 </p>
                                 <Button
                                   variant="ghost"
@@ -514,8 +540,14 @@ export default function Step3Page() {
                                     AI가 대본을 생성하고 있습니다...
                                   </p>
                                 </div>
-                              ) : isEditing ? (
+                              ) : (
                                 <div className="space-y-2">
+                                  {script?.isAiGenerated && (
+                                    <div className="inline-flex items-center gap-2 rounded-full bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-900/60 dark:text-purple-200">
+                                      <Sparkles className="w-3 h-3" />
+                                      AI 생성 스크립트
+                                    </div>
+                                  )}
                                   <textarea
                                     value={editedScript}
                                     onChange={(e) => handleScriptEdit(index, e.target.value)}
@@ -525,54 +557,18 @@ export default function Step3Page() {
                                         ? 'bg-gray-800 border-gray-700 text-white'
                                         : 'bg-white border-gray-300 text-gray-900'
                                     } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                                    placeholder="이 씬에서 말할 내용을 자유롭게 입력하거나, 상단의 AI 스크립트 생성 버튼을 눌러 자동으로 만들어보세요."
                                   />
-                                  <div className="flex gap-2">
+                                  <div className="flex justify-end">
                                     <Button
                                       size="sm"
+                                      variant="outline"
+                                      className="gap-1"
                                       onClick={() => handleScriptSave(index)}
                                     >
                                       저장
                                     </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingSceneId(null)
-                                        setEditedScripts((prev) => {
-                                          const newMap = new Map(prev)
-                                          newMap.delete(index)
-                                          return newMap
-                                        })
-                                      }}
-                                    >
-                                      취소
-                                    </Button>
                                   </div>
-                                </div>
-                              ) : script ? (
-                                <div className="space-y-2">
-                                  <p className={`text-sm whitespace-pre-wrap ${
-                                    theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                                  }`}>
-                                    {script.script}
-                                  </p>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setEditingSceneId(index)}
-                                    className="gap-1"
-                                  >
-                                    <Edit2 className="w-3 h-3" />
-                                    수정
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  <p className={`text-sm ${
-                                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                                  }`}>
-                                    아직 이 이미지에 대한 대본이 없습니다. 상단의 &quot;AI 스크립트 전체 생성&quot; 버튼을 눌러 모든 이미지에 대한 대본을 한 번에 생성하세요.
-                                  </p>
                                 </div>
                               )}
                             </div>

@@ -35,7 +35,7 @@ export default function StepIndicator() {
   }
 
   return (
-    <div className={`sticky top-0 w-40 md:w-48 h-screen flex flex-col py-4 md:py-6 transition-colors z-10 flex-shrink-0 ${
+    <div className={`sticky top-0 w-52 md:w-64 h-screen flex flex-col py-4 md:py-6 transition-colors z-10 flex-shrink-0 ${
       theme === 'dark'
         ? 'bg-gray-900 border-gray-800'
         : 'bg-white border-gray-200'
@@ -63,7 +63,7 @@ export default function StepIndicator() {
                 <div className="flex items-center gap-4 w-full">
                   <div
                     className={cn(
-                      'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all',
+                      'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all shrink-0',
                       isActive
                         ? theme === 'dark'
                           ? 'bg-purple-600 text-white'
