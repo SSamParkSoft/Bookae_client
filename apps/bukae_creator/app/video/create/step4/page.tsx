@@ -56,19 +56,23 @@ export default function Step4Page() {
     const nextTimeline: TimelineData = {
       fps: 30,
       resolution: '1080x1920',
-      scenes: scenes.map((scene, index) => ({
-        sceneId: scene.sceneId,
-        duration: 2.5, // 기본 2.5초
-        transition: 'fade',
-        image: scene.imageUrl || selectedImages[index] || '',
-        text: {
-          content: scene.script,
-          font: subtitleFont || 'Pretendard-Bold',
-          color: subtitleColor || '#ffffff',
-          position: subtitlePosition || 'center',
-          fontSize: 32,
-        },
-      })),
+      scenes: scenes.map((scene, index) => {
+        // 기존 timeline이 있으면 기존 값 유지, 없으면 기본값 사용
+        const existingScene = timeline?.scenes[index]
+        return {
+          sceneId: scene.sceneId,
+          duration: existingScene?.duration || 2.5, // 기본 2.5초
+          transition: existingScene?.transition || 'fade',
+          image: scene.imageUrl || selectedImages[index] || '',
+          text: {
+            content: scene.script,
+            font: subtitleFont || 'Pretendard-Bold',
+            color: subtitleColor || '#ffffff',
+            position: subtitlePosition || 'center',
+            fontSize: existingScene?.text?.fontSize || 32,
+          },
+        }
+      }),
     }
     setTimeline(nextTimeline)
   }, [scenes, selectedImages, subtitleFont, subtitleColor, subtitlePosition, setTimeline])
@@ -244,6 +248,19 @@ export default function Step4Page() {
       i === index ? { ...scene, script: value } : scene,
     )
     setScenes(updatedScenes)
+    
+    // 타임라인도 즉시 업데이트
+    if (timeline) {
+      const nextTimeline: TimelineData = {
+        ...timeline,
+        scenes: timeline.scenes.map((scene, i) =>
+          i === index
+            ? { ...scene, text: { ...scene.text, content: value } }
+            : scene,
+        ),
+      }
+      setTimeline(nextTimeline)
+    }
   }
 
   // 씬 전환 효과 수정
