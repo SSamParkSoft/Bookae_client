@@ -275,6 +275,114 @@ export default function Step4Page() {
     setTimeline(nextTimeline)
   }
 
+  // 씬 재생 시간(duration) 수정
+  const handleSceneDurationChange = (index: number, value: number) => {
+    if (!timeline) return
+    const clampedValue = Math.max(0.5, Math.min(10, value)) // 0.5초 ~ 10초 제한
+    const nextTimeline: TimelineData = {
+      ...timeline,
+      scenes: timeline.scenes.map((scene, i) =>
+        i === index ? { ...scene, duration: clampedValue } : scene,
+      ),
+    }
+    setTimeline(nextTimeline)
+    
+    // 재생 중이면 현재 시간도 조정
+    if (isPlaying) {
+      const timeUntilScene = nextTimeline.scenes
+        .slice(0, index)
+        .reduce((acc, scene) => acc + scene.duration, 0)
+      if (currentTime > timeUntilScene + clampedValue) {
+        setCurrentTime(timeUntilScene + clampedValue)
+      }
+    }
+  }
+
+  // 타임라인 바 클릭/드래그로 위치 이동
+  const [isDraggingTimeline, setIsDraggingTimeline] = useState(false)
+  const timelineBarRef = useRef<HTMLDivElement>(null)
+
+  const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!timeline) return
+    // 드래그 시작 시 재생 일시정지
+    if (isPlaying) {
+      setIsPlaying(false)
+    }
+    setIsDraggingTimeline(true)
+    handleTimelineClick(e)
+  }
+
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!timeline || !timelineBarRef.current) return
+    
+    const rect = timelineBarRef.current.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width))
+    
+    const totalDuration = timeline.scenes.reduce(
+      (acc, scene) => acc + scene.duration,
+      0,
+    )
+    const targetTime = ratio * totalDuration
+    
+    setCurrentTime(targetTime)
+    
+    // 해당 시간에 맞는 씬 인덱스 계산
+    let accumulated = 0
+    let sceneIndex = 0
+    for (let i = 0; i < timeline.scenes.length; i++) {
+      accumulated += timeline.scenes[i].duration
+      if (targetTime <= accumulated) {
+        sceneIndex = i
+        break
+      }
+    }
+    setCurrentSceneIndex(sceneIndex)
+  }
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingTimeline || !timeline || !timelineBarRef.current) return
+      
+      const rect = timelineBarRef.current.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const ratio = Math.max(0, Math.min(1, mouseX / rect.width))
+      
+      const totalDuration = timeline.scenes.reduce(
+        (acc, scene) => acc + scene.duration,
+        0,
+      )
+      const targetTime = ratio * totalDuration
+      
+      setCurrentTime(targetTime)
+      
+      // 해당 시간에 맞는 씬 인덱스 계산
+      let accumulated = 0
+      let sceneIndex = 0
+      for (let i = 0; i < timeline.scenes.length; i++) {
+        accumulated += timeline.scenes[i].duration
+        if (targetTime <= accumulated) {
+          sceneIndex = i
+          break
+        }
+      }
+      setCurrentSceneIndex(sceneIndex)
+    }
+
+    const handleMouseUp = () => {
+      setIsDraggingTimeline(false)
+    }
+
+    if (isDraggingTimeline) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [isDraggingTimeline, timeline])
+
   // 최종 영상 생성
   const handleGenerateVideo = async () => {
     if (!timeline) {
@@ -341,11 +449,18 @@ export default function Step4Page() {
                         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                           <span>Scene {currentSceneIndex + 1} / {scenes.length || 0}</span>
                         </div>
-                        <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                        <div
+                          ref={timelineBarRef}
+                          className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden cursor-pointer relative"
+                          onMouseDown={handleTimelineMouseDown}
+                        >
                           <div
                             className="h-full bg-purple-500 transition-all"
                             style={{ width: `${progressRatio * 100}%` }}
                           />
+                          {isDraggingTimeline && (
+                            <div className="absolute inset-0 bg-purple-500/20" />
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -518,28 +633,61 @@ export default function Step4Page() {
                                 ) : null}
                               </div>
                               <div className="flex-1 space-y-2">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                   <span className={`text-xs font-semibold uppercase ${
                                     theme === 'dark' ? 'text-purple-300' : 'text-purple-700'
                                   }`}>
                                     Scene {index + 1}
                                   </span>
-                                  <select
-                                    value={sceneTransition}
-                                    onChange={(e) =>
-                                      handleSceneTransitionChange(index, e.target.value)
-                                    }
-                                    className={`text-xs rounded-md border px-2 py-1 bg-transparent ${
-                                      theme === 'dark'
-                                        ? 'border-gray-700 text-gray-200'
-                                        : 'border-gray-300 text-gray-700'
-                                    } focus:outline-none focus:ring-1 focus:ring-purple-500`}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <option value="fade">Fade</option>
-                                    <option value="slide">Slide</option>
-                                    <option value="zoom">Zoom</option>
-                                  </select>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
+                                      <span className={`text-xs ${
+                                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        시간:
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0.5"
+                                        max="10"
+                                        step="0.1"
+                                        value={timeline?.scenes[index]?.duration?.toFixed(1) || '2.5'}
+                                        onChange={(e) => {
+                                          const value = parseFloat(e.target.value)
+                                          if (!isNaN(value)) {
+                                            handleSceneDurationChange(index, value)
+                                          }
+                                        }}
+                                        className={`w-12 text-xs rounded-md border px-1 py-0.5 text-right ${
+                                          theme === 'dark'
+                                            ? 'bg-gray-800 border-gray-700 text-white'
+                                            : 'bg-white border-gray-300 text-gray-900'
+                                        } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <span className={`text-xs ${
+                                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        초
+                                      </span>
+                                    </div>
+                                    <select
+                                      value={sceneTransition}
+                                      onChange={(e) =>
+                                        handleSceneTransitionChange(index, e.target.value)
+                                      }
+                                      className={`text-xs rounded-md border px-2 py-1 bg-transparent ${
+                                        theme === 'dark'
+                                          ? 'border-gray-700 text-gray-200'
+                                          : 'border-gray-300 text-gray-700'
+                                      } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <option value="fade">Fade</option>
+                                      <option value="slide">Slide</option>
+                                      <option value="zoom">Zoom</option>
+                                    </select>
+                                  </div>
                                 </div>
                                 <textarea
                                   rows={3}
