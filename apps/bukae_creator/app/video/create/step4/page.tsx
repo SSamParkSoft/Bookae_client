@@ -1,20 +1,20 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ArrowRight, Play, Pause, Settings, Type, Music, Shuffle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import StepIndicator from '@/components/StepIndicator'
-import { useVideoCreateStore, TimelineData, TimelineScene } from '@/store/useVideoCreateStore'
+import { useVideoCreateStore, TimelineData } from '@/store/useVideoCreateStore'
 import { useThemeStore } from '@/store/useThemeStore'
 import SubtitleSelectionDialog from '@/components/SubtitleSelectionDialog'
 import BgmSelectionDialog from '@/components/BgmSelectionDialog'
 import TransitionEffectDialog from '@/components/TransitionEffectDialog'
 import VoiceSelectionDialog from '@/components/VoiceSelectionDialog'
 
-export default function Step5Page() {
+export default function Step4Page() {
   const router = useRouter()
   const { 
     scenes,
@@ -33,6 +33,7 @@ export default function Step5Page() {
     setBgmTemplate,
     setTransitionTemplate,
     setVoiceTemplate,
+    setScenes,
   } = useVideoCreateStore()
   const theme = useThemeStore((state) => state.theme)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -41,29 +42,36 @@ export default function Step5Page() {
   const [currentTime, setCurrentTime] = useState(0)
   const animationFrameRef = useRef<number>()
 
-  // 타임라인 초기화
+  // 씬 썸네일 계산
+  const sceneThumbnails = useMemo(
+    () =>
+      scenes.map((scene, index) => scene.imageUrl || selectedImages[index] || ''),
+    [scenes, selectedImages],
+  )
+
+  // 타임라인 초기화 및 갱신
   useEffect(() => {
-    if (scenes.length > 0 && !timeline) {
-      const initialTimeline: TimelineData = {
-        fps: 30,
-        resolution: '1080x1920',
-        scenes: scenes.map((scene, index) => ({
-          sceneId: scene.sceneId,
-          duration: 2.5, // 기본 2.5초
-          transition: 'fade',
-          image: scene.imageUrl || selectedImages[index] || '',
-          text: {
-            content: scene.script,
-            font: subtitleFont || 'Pretendard-Bold',
-            color: subtitleColor || '#ffffff',
-            position: subtitlePosition || 'center',
-            fontSize: 32,
-          },
-        })),
-      }
-      setTimeline(initialTimeline)
+    if (scenes.length === 0) return
+
+    const nextTimeline: TimelineData = {
+      fps: 30,
+      resolution: '1080x1920',
+      scenes: scenes.map((scene, index) => ({
+        sceneId: scene.sceneId,
+        duration: 2.5, // 기본 2.5초
+        transition: 'fade',
+        image: scene.imageUrl || selectedImages[index] || '',
+        text: {
+          content: scene.script,
+          font: subtitleFont || 'Pretendard-Bold',
+          color: subtitleColor || '#ffffff',
+          position: subtitlePosition || 'center',
+          fontSize: 32,
+        },
+      })),
     }
-  }, [scenes, selectedImages, timeline, subtitleFont, subtitleColor, subtitlePosition, setTimeline])
+    setTimeline(nextTimeline)
+  }, [scenes, selectedImages, subtitleFont, subtitleColor, subtitlePosition, setTimeline])
 
   // Canvas 렌더링
   useEffect(() => {
@@ -152,6 +160,92 @@ export default function Step5Page() {
     setIsPlaying(!isPlaying)
   }
 
+  // Scene 클릭 시 해당 씬으로 이동
+  const handleSceneSelect = (index: number) => {
+    if (!timeline) return
+    setCurrentSceneIndex(index)
+
+    // 선택한 씬의 시작 시점으로 currentTime 이동
+    const timeUntilScene = timeline.scenes
+      .slice(0, index)
+      .reduce((acc, scene) => acc + scene.duration, 0)
+    setCurrentTime(timeUntilScene)
+  }
+
+  // 재생 루프
+  useEffect(() => {
+    if (!isPlaying || !timeline) return
+
+    const totalDuration = timeline.scenes.reduce(
+      (acc, scene) => acc + scene.duration,
+      0,
+    )
+
+    let lastTimestamp: number | null = null
+
+    const tick = (timestamp: number) => {
+      if (!lastTimestamp) {
+        lastTimestamp = timestamp
+      }
+      const deltaSeconds = (timestamp - lastTimestamp) / 1000
+      lastTimestamp = timestamp
+
+      setCurrentTime((prev) => {
+        let next = prev + deltaSeconds
+
+        if (next >= totalDuration) {
+          setIsPlaying(false)
+          next = totalDuration
+        }
+
+        // 현재 시간에 해당하는 씬 인덱스 계산
+        let accumulated = 0
+        let sceneIndex = 0
+        for (let i = 0; i < timeline.scenes.length; i++) {
+          accumulated += timeline.scenes[i].duration
+          if (next <= accumulated) {
+            sceneIndex = i
+            break
+          }
+        }
+        setCurrentSceneIndex(sceneIndex)
+
+        return next
+      })
+
+      if (animationFrameRef.current !== undefined && isPlaying) {
+        animationFrameRef.current = requestAnimationFrame(tick)
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      if (animationFrameRef.current !== undefined) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+    }
+  }, [isPlaying, timeline])
+
+  // 전체 재생 길이와 현재 위치 비율
+  const progressRatio = useMemo(() => {
+    if (!timeline || timeline.scenes.length === 0) return 0
+    const total = timeline.scenes.reduce(
+      (acc, scene) => acc + scene.duration,
+      0,
+    )
+    if (total === 0) return 0
+    return Math.min(1, currentTime / total)
+  }, [timeline, currentTime])
+
+  // 씬 스크립트 수정
+  const handleSceneScriptChange = (index: number, value: string) => {
+    const updatedScenes = scenes.map((scene, i) =>
+      i === index ? { ...scene, script: value } : scene,
+    )
+    setScenes(updatedScenes)
+  }
+
   // 최종 영상 생성
   const handleGenerateVideo = async () => {
     if (!timeline) {
@@ -180,7 +274,7 @@ export default function Step5Page() {
       <div className="flex w-full max-w-[1600px]">
         <StepIndicator />
         <div className="flex-1 p-4 md:p-8 overflow-y-auto min-w-0">
-          <div className="max-w-5xl mx-auto space-y-6">
+          <div className="max-w-6xl mx-auto space-y-6">
             <div>
               <h1 className={`text-3xl font-bold mb-2 ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
@@ -190,149 +284,237 @@ export default function Step5Page() {
               <p className={`mt-2 ${
                 theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
               }`}>
-                Canvas 기반 실시간 미리보기에서 효과를 적용하고 확인하세요
+                왼쪽 미리보기에서 전체 흐름을 확인하고, 오른쪽에서 각 Scene의 자막과 효과를 편집하세요.
               </p>
             </div>
 
-            {/* Canvas 미리보기 */}
-            <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-              <CardHeader>
-                <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                  실시간 미리보기
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center gap-4">
-                  <div className="relative border-2 border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <canvas
-                      ref={canvasRef}
-                      className="w-full max-w-[540px] h-auto bg-black"
-                      style={{ aspectRatio: '9/16' }}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handlePlayPause}
-                      variant="outline"
-                      size="sm"
-                    >
-                      {isPlaying ? (
-                        <>
-                          <Pause className="w-4 h-4 mr-2" />
-                          일시정지
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4 mr-2" />
-                          재생
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={handleGenerateVideo}
-                      size="sm"
-                    >
-                      최종 영상 만들기
-                    </Button>
-                  </div>
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6">
+              {/* 좌측: Canvas 미리보기 + 효과 */}
+              <div className="space-y-4">
+                {/* Canvas 미리보기 */}
+                <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
+                  <CardHeader>
+                    <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+                      실시간 미리보기
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col gap-4">
+                      <div className="relative border-2 border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden self-center">
+                        <canvas
+                          ref={canvasRef}
+                          className="w-full max-w-[540px] h-auto bg-black"
+                          style={{ aspectRatio: '9/16' }}
+                        />
+                      </div>
+                      {/* 재생 바 */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>Scene {currentSceneIndex + 1} / {scenes.length || 0}</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                          <div
+                            className="h-full bg-purple-500 transition-all"
+                            style={{ width: `${progressRatio * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handlePlayPause}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {isPlaying ? (
+                            <>
+                              <Pause className="w-4 h-4 mr-2" />
+                              일시정지
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-4 h-4 mr-2" />
+                              재생
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          onClick={handleGenerateVideo}
+                          size="sm"
+                        >
+                          최종 영상 만들기
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 효과 선택 */}
+                <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
+                  <CardHeader>
+                    <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+                      효과 선택
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 자막 선택 */}
+                      <SubtitleSelectionDialog>
+                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
+                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+                        }`}>
+                          <CardHeader>
+                            <CardTitle className={`flex items-center gap-2 text-base ${
+                              theme === 'dark' ? 'text-white' : 'text-gray-900'
+                            }`}>
+                              <Type className={`w-5 h-5 ${
+                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                              }`} />
+                              자막 선택
+                            </CardTitle>
+                          </CardHeader>
+                        </Card>
+                      </SubtitleSelectionDialog>
+
+                      {/* 배경음악 선택 */}
+                      <BgmSelectionDialog>
+                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
+                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+                        }`}>
+                          <CardHeader>
+                            <CardTitle className={`flex items-center gap-2 text-base ${
+                              theme === 'dark' ? 'text-white' : 'text-gray-900'
+                            }`}>
+                              <Music className={`w-5 h-5 ${
+                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                              }`} />
+                              배경음악 선택
+                            </CardTitle>
+                          </CardHeader>
+                        </Card>
+                      </BgmSelectionDialog>
+
+                      {/* 전환 효과 */}
+                      <TransitionEffectDialog>
+                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
+                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+                        }`}>
+                          <CardHeader>
+                            <CardTitle className={`flex items-center gap-2 text-base ${
+                              theme === 'dark' ? 'text-white' : 'text-gray-900'
+                            }`}>
+                              <Shuffle className={`w-5 h-5 ${
+                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                              }`} />
+                              전환 효과
+                            </CardTitle>
+                          </CardHeader>
+                        </Card>
+                      </TransitionEffectDialog>
+
+                      {/* 목소리 선택 */}
+                      <VoiceSelectionDialog>
+                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
+                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+                        }`}>
+                          <CardHeader>
+                            <CardTitle className={`flex items-center gap-2 text-base ${
+                              theme === 'dark' ? 'text-white' : 'text-gray-900'
+                            }`}>
+                              <Settings className={`w-5 h-5 ${
+                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                              }`} />
+                              목소리 선택
+                            </CardTitle>
+                          </CardHeader>
+                        </Card>
+                      </VoiceSelectionDialog>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 다음 단계 버튼 */}
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={handleNext}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    다음 단계
+                    <ArrowRight className="w-5 h-5" />
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* 효과 선택 */}
-            <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-              <CardHeader>
-                <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                  효과 선택
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* 자막 선택 */}
-                  <SubtitleSelectionDialog>
-                    <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                      theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                    }`}>
-                      <CardHeader>
-                        <CardTitle className={`flex items-center gap-2 text-base ${
-                          theme === 'dark' ? 'text-white' : 'text-gray-900'
-                        }`}>
-                          <Type className={`w-5 h-5 ${
-                            theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                          }`} />
-                          자막 선택
-                        </CardTitle>
-                      </CardHeader>
-                    </Card>
-                  </SubtitleSelectionDialog>
-
-                  {/* 배경음악 선택 */}
-                  <BgmSelectionDialog>
-                    <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                      theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                    }`}>
-                      <CardHeader>
-                        <CardTitle className={`flex items-center gap-2 text-base ${
-                          theme === 'dark' ? 'text-white' : 'text-gray-900'
-                        }`}>
-                          <Music className={`w-5 h-5 ${
-                            theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                          }`} />
-                          배경음악 선택
-                        </CardTitle>
-                      </CardHeader>
-                    </Card>
-                  </BgmSelectionDialog>
-
-                  {/* 전환 효과 */}
-                  <TransitionEffectDialog>
-                    <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                      theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                    }`}>
-                      <CardHeader>
-                        <CardTitle className={`flex items-center gap-2 text-base ${
-                          theme === 'dark' ? 'text-white' : 'text-gray-900'
-                        }`}>
-                          <Shuffle className={`w-5 h-5 ${
-                            theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                          }`} />
-                          전환 효과
-                        </CardTitle>
-                      </CardHeader>
-                    </Card>
-                  </TransitionEffectDialog>
-
-                  {/* 목소리 선택 */}
-                  <VoiceSelectionDialog>
-                    <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                      theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                    }`}>
-                      <CardHeader>
-                        <CardTitle className={`flex items-center gap-2 text-base ${
-                          theme === 'dark' ? 'text-white' : 'text-gray-900'
-                        }`}>
-                          <Settings className={`w-5 h-5 ${
-                            theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                          }`} />
-                          목소리 선택
-                        </CardTitle>
-                      </CardHeader>
-                    </Card>
-                  </VoiceSelectionDialog>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 다음 단계 버튼 */}
-            <div className="flex justify-end pt-4">
-              <Button
-                onClick={handleNext}
-                size="lg"
-                className="gap-2"
-              >
-                다음 단계
-                <ArrowRight className="w-5 h-5" />
-              </Button>
+              {/* 우측: Scene 리스트 */}
+              <div className="space-y-3">
+                <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
+                  <CardHeader>
+                    <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+                      Scene 리스트
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {scenes.length === 0 ? (
+                      <p className={`text-sm ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                        Step3에서 이미지와 스크립트를 먼저 생성해주세요.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {scenes.map((scene, index) => {
+                          const thumb = sceneThumbnails[index]
+                          const isActive = currentSceneIndex === index
+                          return (
+                            <div
+                              key={scene.sceneId ?? index}
+                              className={`flex gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                                isActive
+                                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                                  : theme === 'dark'
+                                    ? 'border-gray-700 bg-gray-900 hover:border-purple-500'
+                                    : 'border-gray-200 bg-white hover:border-purple-500'
+                              }`}
+                              onClick={() => handleSceneSelect(index)}
+                            >
+                              <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0">
+                                {thumb ? (
+                                  <img
+                                    src={thumb}
+                                    alt={`Scene ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : null}
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className={`text-xs font-semibold uppercase ${
+                                    theme === 'dark' ? 'text-purple-300' : 'text-purple-700'
+                                  }`}>
+                                    Scene {index + 1}
+                                  </span>
+                                </div>
+                                <textarea
+                                  rows={3}
+                                  value={scene.script}
+                                  onChange={(e) =>
+                                    handleSceneScriptChange(index, e.target.value)
+                                  }
+                                  className={`w-full text-sm rounded-md border px-2 py-1 resize-none ${
+                                    theme === 'dark'
+                                      ? 'bg-gray-800 border-gray-700 text-white'
+                                      : 'bg-white border-gray-300 text-gray-900'
+                                  } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>

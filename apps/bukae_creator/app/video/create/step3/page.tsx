@@ -355,7 +355,7 @@ export default function Step3Page() {
     }
     
     setScenes(finalScenes)
-    router.push('/video/create/step5')
+    router.push('/video/create/step4')
   }
 
   return (
