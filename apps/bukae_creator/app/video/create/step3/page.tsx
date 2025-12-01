@@ -3,11 +3,11 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { ArrowRight, GripVertical, Plus, X } from 'lucide-react'
+import { ArrowRight, GripVertical, X, Loader2, CheckCircle2, Edit2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import StepIndicator from '@/components/StepIndicator'
-import { useVideoCreateStore } from '@/store/useVideoCreateStore'
+import { useVideoCreateStore, SceneScript } from '@/store/useVideoCreateStore'
 import { useThemeStore } from '@/store/useThemeStore'
 import { useProduct } from '@/lib/hooks/useProducts'
 import { useImages } from '@/lib/hooks/useImages'
@@ -18,7 +18,11 @@ export default function Step3Page() {
     selectedProducts, 
     selectedImages, 
     setSelectedImages,
-    creationMode 
+    creationMode,
+    scriptStyle,
+    tone,
+    scenes,
+    setScenes,
   } = useVideoCreateStore()
   const theme = useThemeStore((state) => state.theme)
   const selectedProduct = selectedProducts[0]
@@ -72,15 +76,159 @@ export default function Step3Page() {
   }, [productData, allImages, selectedProduct])
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [generatingScenes, setGeneratingScenes] = useState<Set<number>>(new Set())
+  const [sceneScripts, setSceneScripts] = useState<Map<number, SceneScript>>(new Map())
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false)
+  const [editingSceneId, setEditingSceneId] = useState<number | null>(null)
+  const [editedScripts, setEditedScripts] = useState<Map<number, string>>(new Map())
+
+  // 이미지별 대본 생성 (단일 이미지용 - 현재는 일괄 생성에서만 사용)
+  const generateScriptForImage = async (imageUrl: string, sceneIndex: number) => {
+    if (!scriptStyle || !tone) {
+      return
+    }
+
+    setGeneratingScenes((prev) => new Set(prev).add(sceneIndex))
+
+    try {
+      const response = await fetch('/api/script/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scriptStyle: scriptStyle,
+          tone: tone,
+          images: [imageUrl], // 단일 이미지에 대한 대본 생성
+          product: selectedProducts[0] ? {
+            name: selectedProducts[0].name,
+            price: selectedProducts[0].price,
+            description: selectedProducts[0].description,
+          } : null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('대본 생성에 실패했습니다.')
+      }
+
+      const data = await response.json()
+      if (data.scenes && data.scenes.length > 0) {
+        const sceneScript: SceneScript = {
+          sceneId: sceneIndex + 1,
+          script: data.scenes[0].script,
+          imageUrl: imageUrl,
+        }
+        
+        setSceneScripts((prev) => {
+          const newMap = new Map(prev)
+          newMap.set(sceneIndex, sceneScript)
+          return newMap
+        })
+      }
+    } catch (error) {
+      console.error('대본 생성 오류:', error)
+    } finally {
+      setGeneratingScenes((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(sceneIndex)
+        return newSet
+      })
+    }
+  }
+
+  // 선택된 모든 이미지에 대해 일괄 대본 생성
+  const handleGenerateAllScripts = async () => {
+    if (!scriptStyle || !tone) {
+      alert('Step2에서 대본 스타일과 톤을 먼저 선택해주세요.')
+      return
+    }
+
+    if (selectedImages.length === 0) {
+      alert('이미지를 먼저 선택해주세요.')
+      return
+    }
+
+    setIsGeneratingAll(true)
+    setGeneratingScenes(new Set(selectedImages.map((_, index) => index)))
+
+    try {
+      const response = await fetch('/api/script/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scriptStyle,
+          tone,
+          images: selectedImages,
+          product: selectedProducts[0]
+            ? {
+                name: selectedProducts[0].name,
+                price: selectedProducts[0].price,
+                description: selectedProducts[0].description,
+              }
+            : null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('대본 생성에 실패했습니다.')
+      }
+
+      const data = await response.json()
+      const apiScenes: { sceneId?: number; script: string }[] = data.scenes || []
+
+      setSceneScripts(() => {
+        const newMap = new Map<number, SceneScript>()
+        selectedImages.forEach((imageUrl, index) => {
+          const sceneData = apiScenes[index]
+          newMap.set(index, {
+            sceneId: index + 1,
+            script: sceneData?.script || '생성된 대본이 없습니다.',
+            imageUrl,
+          })
+        })
+        return newMap
+      })
+    } catch (error) {
+      console.error('대본 일괄 생성 오류:', error)
+      alert('대본 일괄 생성 중 오류가 발생했습니다.')
+    } finally {
+      setIsGeneratingAll(false)
+      setGeneratingScenes(new Set())
+    }
+  }
 
   // 이미지 선택
   const handleImageSelect = (imageUrl: string) => {
     if (selectedImages.includes(imageUrl)) {
       // 이미 선택된 이미지는 제거
+      const index = selectedImages.indexOf(imageUrl)
       setSelectedImages(selectedImages.filter(url => url !== imageUrl))
+      
+      // 해당 씬 스크립트도 제거
+      setSceneScripts((prev) => {
+        const newMap = new Map(prev)
+        newMap.delete(index)
+        // 인덱스 재정렬
+        const reorderedMap = new Map<number, SceneScript>()
+        let newIndex = 0
+        selectedImages.forEach((url, i) => {
+          if (i !== index && prev.has(i)) {
+            const script = prev.get(i)!
+            script.sceneId = newIndex + 1
+            reorderedMap.set(newIndex, script)
+            newIndex++
+          }
+        })
+        return reorderedMap
+      })
     } else {
       // 새 이미지 추가
+      const newIndex = selectedImages.length
       setSelectedImages([...selectedImages, imageUrl])
+      // 대본은 사용자가 명시적으로 버튼을 눌렀을 때만 생성
     }
   }
 
@@ -98,12 +246,65 @@ export default function Step3Page() {
     newImages.splice(dropIndex, 0, removed)
 
     setSelectedImages(newImages)
+    
+    // 스크립트도 재정렬
+    setSceneScripts((prev) => {
+      const newMap = new Map<number, SceneScript>()
+      newImages.forEach((imageUrl, newIndex) => {
+        // 기존 스크립트 찾기
+        let foundScript: SceneScript | undefined
+        for (const [oldIndex, script] of prev.entries()) {
+          if (script.imageUrl === imageUrl) {
+            foundScript = script
+            break
+          }
+        }
+        
+        if (foundScript) {
+          foundScript.sceneId = newIndex + 1
+          newMap.set(newIndex, foundScript)
+        }
+      })
+      return newMap
+    })
+    
     setDraggedIndex(null)
   }
 
   // 드래그 종료
   const handleDragEnd = () => {
     setDraggedIndex(null)
+  }
+
+  // 대본 수정
+  const handleScriptEdit = (sceneIndex: number, newScript: string) => {
+    setEditedScripts((prev) => {
+      const newMap = new Map(prev)
+      newMap.set(sceneIndex, newScript)
+      return newMap
+    })
+  }
+
+  // 대본 저장
+  const handleScriptSave = (sceneIndex: number) => {
+    const editedScript = editedScripts.get(sceneIndex)
+    if (editedScript) {
+      setSceneScripts((prev) => {
+        const newMap = new Map(prev)
+        const script = newMap.get(sceneIndex)
+        if (script) {
+          script.script = editedScript
+          newMap.set(sceneIndex, script)
+        }
+        return newMap
+      })
+      setEditedScripts((prev) => {
+        const newMap = new Map(prev)
+        newMap.delete(sceneIndex)
+        return newMap
+      })
+    }
+    setEditingSceneId(null)
   }
 
   // 다음 단계로 이동
@@ -113,7 +314,24 @@ export default function Step3Page() {
       return
     }
 
-    router.push('/video/create/step4')
+    // 모든 씬 스크립트를 배열로 변환하여 저장
+    const finalScenes: SceneScript[] = []
+    for (let i = 0; i < selectedImages.length; i++) {
+      const script = sceneScripts.get(i)
+      if (script) {
+        finalScenes.push(script)
+      } else {
+        // 대본이 없는 경우 기본 대본 생성
+        finalScenes.push({
+          sceneId: i + 1,
+          script: '대본을 생성 중입니다...',
+          imageUrl: selectedImages[i],
+        })
+      }
+    }
+    
+    setScenes(finalScenes)
+    router.push('/video/create/step5')
   }
 
   return (
@@ -132,91 +350,36 @@ export default function Step3Page() {
               <h1 className={`text-3xl font-bold mb-2 ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
               }`}>
-                이미지 선택 및 순서 설정
+                이미지 선택 및 대본 생성
               </h1>
               <p className={`mt-2 ${
                 theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
               }`}>
-                영상에 사용할 이미지를 선택하고 순서를 조정하세요 (최소 5장 이상 권장)
+                영상에 사용할 이미지를 선택한 뒤, 상단의 AI 스크립트 버튼을 눌러 전체 흐름에 맞는 씬별 대본을 한 번에 생성하고 수정할 수 있습니다. (최소 5장 이상 권장)
               </p>
             </div>
 
-            {/* 선택된 이미지 목록 (드래그 앤 드롭) */}
+            {/* AI 스크립트 일괄 생성 버튼 */}
             {selectedImages.length > 0 && (
-              <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-                <CardHeader>
-                  <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                    선택된 이미지 ({selectedImages.length}장)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {selectedImages.map((imageUrl, index) => (
-                      <div
-                        key={`${imageUrl}-${index}`}
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragOver={(e) => {
-                          e.preventDefault()
-                        }}
-                        onDrop={() => handleDrop(index)}
-                        onDragEnd={handleDragEnd}
-                        className={`flex items-center gap-4 p-4 rounded-lg border cursor-move transition-all ${
-                          draggedIndex === index
-                            ? 'opacity-50 border-purple-500'
-                            : theme === 'dark'
-                              ? 'bg-gray-900 border-gray-700 hover:border-purple-500'
-                              : 'bg-gray-50 border-gray-200 hover:border-purple-500'
-                        }`}
-                      >
-                        <GripVertical className={`w-5 h-5 ${
-                          theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                        }`} />
-                        <div className="flex-1 flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
-                            <img
-                              src={imageUrl}
-                              alt={`Image ${index + 1}`}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200'
-                              }}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <p className={`text-sm font-medium ${
-                              theme === 'dark' ? 'text-white' : 'text-gray-900'
-                            }`}>
-                              씬 {index + 1}
-                            </p>
-                            <p className={`text-xs ${
-                              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                            }`}>
-                              {imageUrl.substring(0, 50)}...
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedImages(selectedImages.filter((_, i) => i !== index))
-                          }}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleGenerateAllScripts}
+                  disabled={isGeneratingAll}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {isGeneratingAll ? 'AI 스크립트 생성 중...' : 'AI 스크립트 전체 생성'}
+                </Button>
+              </div>
             )}
 
             {/* 사용 가능한 이미지 목록 */}
             <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
               <CardHeader>
                 <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                  사용 가능한 이미지
+                  이미지 추가 (5개 이상 선택 가능)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -267,6 +430,161 @@ export default function Step3Page() {
               </CardContent>
             </Card>
 
+            {/* 선택된 이미지 목록 (드래그 앤 드롭) - 사용 가능한 이미지 아래로 이동 */}
+            {selectedImages.length > 0 && (
+              <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
+                <CardHeader>
+                  <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+                    선택된 이미지 및 대본 ({selectedImages.length}장)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {selectedImages.map((imageUrl, index) => {
+                      const script = sceneScripts.get(index)
+                      const isGenerating = generatingScenes.has(index)
+                      const isEditing = editingSceneId === index
+                      const editedScript = editedScripts.get(index) || script?.script || ''
+                      
+                      return (
+                        <div
+                          key={`${imageUrl}-${index}`}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                          }}
+                          onDrop={() => handleDrop(index)}
+                          onDragEnd={handleDragEnd}
+                          className={`p-4 rounded-lg border transition-all ${
+                            draggedIndex === index
+                              ? 'opacity-50 border-purple-500'
+                              : theme === 'dark'
+                                ? 'bg-gray-900 border-gray-700 hover:border-purple-500'
+                                : 'bg-gray-50 border-gray-200 hover:border-purple-500'
+                          }`}
+                        >
+                          <div className="flex items-start gap-4">
+                            <GripVertical className={`w-5 h-5 mt-2 cursor-move ${
+                              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                            }`} />
+                            
+                            <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                              <img
+                                src={imageUrl}
+                                alt={`Image ${index + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200'
+                                }}
+                              />
+                            </div>
+                            
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <p className={`text-sm font-medium ${
+                                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                                }`}>
+                                  씬 {index + 1}
+                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedImages(selectedImages.filter((_, i) => i !== index))
+                                    setSceneScripts((prev) => {
+                                      const newMap = new Map(prev)
+                                      newMap.delete(index)
+                                      return newMap
+                                    })
+                                  }}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                              
+                              {isGenerating ? (
+                                <div className="flex items-center gap-2 py-2">
+                                  <Loader2 className={`w-4 h-4 animate-spin ${
+                                    theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
+                                  }`} />
+                                  <p className={`text-sm ${
+                                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                                  }`}>
+                                    AI가 대본을 생성하고 있습니다...
+                                  </p>
+                                </div>
+                              ) : isEditing ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    value={editedScript}
+                                    onChange={(e) => handleScriptEdit(index, e.target.value)}
+                                    rows={3}
+                                    className={`w-full p-2 rounded-lg border resize-none text-sm ${
+                                      theme === 'dark'
+                                        ? 'bg-gray-800 border-gray-700 text-white'
+                                        : 'bg-white border-gray-300 text-gray-900'
+                                    } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleScriptSave(index)}
+                                    >
+                                      저장
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingSceneId(null)
+                                        setEditedScripts((prev) => {
+                                          const newMap = new Map(prev)
+                                          newMap.delete(index)
+                                          return newMap
+                                        })
+                                      }}
+                                    >
+                                      취소
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : script ? (
+                                <div className="space-y-2">
+                                  <p className={`text-sm whitespace-pre-wrap ${
+                                    theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                                  }`}>
+                                    {script.script}
+                                  </p>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditingSceneId(index)}
+                                    className="gap-1"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                    수정
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <p className={`text-sm ${
+                                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                                  }`}>
+                                    아직 이 이미지에 대한 대본이 없습니다. 상단의 &quot;AI 스크립트 전체 생성&quot; 버튼을 눌러 모든 이미지에 대한 대본을 한 번에 생성하세요.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 다음 단계 버튼 */}
             {selectedImages.length >= 5 && (
               <motion.div
@@ -305,3 +623,5 @@ export default function Step3Page() {
     </motion.div>
   )
 }
+
+

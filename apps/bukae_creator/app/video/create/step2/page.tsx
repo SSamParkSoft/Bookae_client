@@ -3,12 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { ArrowRight, ChevronDown } from 'lucide-react'
+import { ArrowRight, ChevronDown, Camera, Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import StepIndicator from '@/components/StepIndicator'
-import { useVideoCreateStore } from '@/store/useVideoCreateStore'
+import { useVideoCreateStore, type CreationMode } from '@/store/useVideoCreateStore'
 import { useThemeStore } from '@/store/useThemeStore'
 import { conceptOptions, conceptTones, type ConceptType } from '@/lib/data/templates'
 
@@ -19,12 +19,18 @@ export default function Step2Page() {
     scriptStyle, 
     tone,
     setScriptStyle, 
-    setTone 
+    setTone,
+    setCreationMode,
   } = useVideoCreateStore()
   const theme = useThemeStore((state) => state.theme)
   const [expandedConceptId, setExpandedConceptId] = useState<ConceptType | null>(null)
   const [selectedScriptStyle, setSelectedScriptStyle] = useState<ConceptType | null>(scriptStyle)
   const [selectedTone, setSelectedTone] = useState<string | null>(tone)
+
+  // 제작 방식 선택
+  const handleModeSelect = (mode: CreationMode) => {
+    setCreationMode(mode)
+  }
 
   // 대본 스타일 선택
   const handleScriptStyleSelect = (concept: ConceptType, toneId: string) => {
@@ -80,20 +86,92 @@ export default function Step2Page() {
         <StepIndicator />
         <div className="flex-1 p-4 md:p-8 overflow-y-auto min-w-0">
           <div className="max-w-5xl mx-auto space-y-6">
-            <div>
-              <h1 className={`text-3xl font-bold mb-2 ${
-                theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}>
-                대본 및 스크립트 스타일 선택
-              </h1>
-              <p className={`mt-2 ${
-                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                원하는 대본 및 스크립트 스타일과 말투를 선택해주세요
-              </p>
-            </div>
+            {/* 제작 방식 선택 */}
+            <section className="space-y-4">
+              <div>
+                <h1 className={`text-3xl font-bold mb-2 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}>
+                  제작 방식 선택
+                </h1>
+                <p className={`mt-2 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  직접 촬영하거나, AI에게 모두 맡겨 자동 제작할 수 있습니다.
+                </p>
+              </div>
 
-            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 직접 촬영하기 */}
+                <Card
+                  onClick={() => handleModeSelect('manual')}
+                  className={`cursor-pointer transition-all ${
+                    creationMode === 'manual'
+                      ? 'border-2 border-teal-500 bg-teal-50 dark:bg-teal-900/20'
+                      : theme === 'dark'
+                        ? 'border-gray-700 bg-gray-900 hover:border-teal-500'
+                        : 'border-gray-200 bg-white hover:border-teal-500'
+                  }`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center gap-3 mb-2">
+                      <Camera className={`h-6 w-6 ${
+                        theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`} />
+                      <CardTitle className="text-xl">직접 촬영하기</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-base">
+                      AI가 대본을 만들어 주고, 사용자가 직접 촬영한 영상을 업로드하여 제작합니다.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+
+                {/* AI에게 모두 맡기기 */}
+                <Card
+                  onClick={() => handleModeSelect('auto')}
+                  className={`cursor-pointer transition-all ${
+                    creationMode === 'auto'
+                      ? 'border-2 border-teal-500 bg-teal-50 dark:bg-teal-900/20'
+                      : theme === 'dark'
+                        ? 'border-gray-700 bg-gray-900 hover:border-teal-500'
+                        : 'border-gray-200 bg-white hover:border-teal-500'
+                  }`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center gap-3 mb-2">
+                      <Bot className={`h-6 w-6 ${
+                        theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`} />
+                      <CardTitle className="text-xl">AI에게 모두 맡기기</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="text-base">
+                      AI가 대본과 장면을 구성하고, 이미지 기반으로 자동으로 영상을 제작합니다.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+
+            {/* 대본 스타일 선택 */}
+            <section className="space-y-6">
+              <div>
+                <h2 className={`text-2xl font-bold mb-2 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}>
+                  대본 및 스크립트 스타일 선택
+                </h2>
+                <p className={`mt-2 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  원하는 대본 및 스크립트 스타일과 말투를 선택해주세요
+                </p>
+              </div>
+
+              <div className="space-y-6">
               {conceptOptions.map((conceptOption) => {
                 const tones = conceptTones[conceptOption.id]
                 const toneTiers = Array.from(new Set(tones.map((tone) => tone.tier)))
@@ -171,7 +249,8 @@ export default function Step2Page() {
                   </Card>
                 )
               })}
-            </div>
+              </div>
+            </section>
 
             {selectedScriptStyle && selectedTone && (
               <motion.div
