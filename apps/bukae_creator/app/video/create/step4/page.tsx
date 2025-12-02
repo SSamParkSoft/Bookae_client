@@ -13,6 +13,8 @@ import SubtitleSelectionDialog from '@/components/SubtitleSelectionDialog'
 import BgmSelectionDialog from '@/components/BgmSelectionDialog'
 import TransitionEffectDialog from '@/components/TransitionEffectDialog'
 import VoiceSelectionDialog from '@/components/VoiceSelectionDialog'
+import * as PIXI from 'pixi.js'
+import { gsap } from 'gsap'
 
 export default function Step4Page() {
   const router = useRouter()
@@ -36,15 +38,17 @@ export default function Step4Page() {
     setScenes,
   } = useVideoCreateStore()
   const theme = useThemeStore((state) => state.theme)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const glRef = useRef<WebGLRenderingContext | null>(null)
-  const programRef = useRef<WebGLProgram | null>(null)
-  const texturesRef = useRef<Map<string, WebGLTexture>>(new Map())
+  const pixiContainerRef = useRef<HTMLDivElement>(null)
+  const appRef = useRef<PIXI.Application | null>(null)
+  const texturesRef = useRef<Map<string, PIXI.Texture>>(new Map())
+  const spritesRef = useRef<Map<number, PIXI.Sprite>>(new Map())
+  const textsRef = useRef<Map<number, PIXI.Text>>(new Map())
+  const containerRef = useRef<PIXI.Container | null>(null)
+  const gsapTimelineRef = useRef<gsap.core.Timeline | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
-  const [transitionProgress, setTransitionProgress] = useState(0)
-  const animationFrameRef = useRef<number | undefined>(undefined)
+  const [aspectRatio, setAspectRatio] = useState<string>('9/16')
 
   // 씬 썸네일 계산
   const sceneThumbnails = useMemo(
@@ -57,17 +61,22 @@ export default function Step4Page() {
   useEffect(() => {
     if (scenes.length === 0) return
 
+    // 기존 timeline 참조를 안전하게 가져오기
+    const currentTimeline = timeline
+
     const nextTimeline: TimelineData = {
       fps: 30,
       resolution: '1080x1920',
       scenes: scenes.map((scene, index) => {
         // 기존 timeline이 있으면 기존 값 유지, 없으면 기본값 사용
-        const existingScene = timeline?.scenes[index]
+        const existingScene = currentTimeline?.scenes[index]
         return {
           sceneId: scene.sceneId,
           duration: existingScene?.duration || 2.5, // 기본 2.5초
           transition: existingScene?.transition || 'fade',
+          transitionDuration: existingScene?.transitionDuration || 0.5, // 기본 0.5초
           image: scene.imageUrl || selectedImages[index] || '',
+          imageFit: existingScene?.imageFit || 'cover', // 기본값 cover
           text: {
             content: scene.script,
             font: subtitleFont || 'Pretendard-Bold',
@@ -78,530 +87,273 @@ export default function Step4Page() {
         }
       }),
     }
-    setTimeline(nextTimeline)
+
+    // 실제로 변경이 필요한 경우에만 업데이트
+    const hasChanged = 
+      !currentTimeline ||
+      currentTimeline.scenes.length !== nextTimeline.scenes.length ||
+      nextTimeline.scenes.some((scene, index) => {
+        const existing = currentTimeline.scenes[index]
+        return (
+          !existing ||
+          scene.sceneId !== existing.sceneId ||
+          scene.image !== existing.image ||
+          scene.text.content !== existing.text.content ||
+          scene.text.font !== existing.text.font ||
+          scene.text.color !== existing.text.color ||
+          scene.text.position !== existing.text.position
+        )
+      })
+
+    if (hasChanged) {
+      setTimeline(nextTimeline)
+    }
   }, [scenes, selectedImages, subtitleFont, subtitleColor, subtitlePosition, setTimeline])
 
-  // WebGL Shader 초기화
+  // 비율에 따른 스테이지 크기 계산
+  const stageDimensions = useMemo(() => {
+    const [widthRatio, heightRatio] = aspectRatio.split('/').map(Number)
+    const baseSize = 1080
+    const ratio = widthRatio / heightRatio
+    
+    if (ratio > 1) {
+      // 가로가 더 긴 경우 (16:9 등)
+      return { width: baseSize * ratio, height: baseSize }
+    } else {
+      // 세로가 더 긴 경우 (9:16 등)
+      return { width: baseSize, height: baseSize / ratio }
+    }
+  }, [aspectRatio])
+
+  // PixiJS Application 초기화
   useEffect(() => {
-    if (!canvasRef.current) return
+    if (!pixiContainerRef.current) return
 
-    const canvas = canvasRef.current
-    canvas.width = 1080
-    canvas.height = 1920
+    const container = pixiContainerRef.current
+    const { width, height } = stageDimensions
 
-    const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null
-    if (!gl) {
-      console.warn('WebGL not supported, falling back to Canvas 2D')
-      return
+    // 기존 앱이 있으면 제거
+    if (appRef.current) {
+      appRef.current.destroy(true, { children: true, texture: true })
+      appRef.current = null
     }
 
-    glRef.current = gl
+    // PixiJS Application 생성
+    const app = new PIXI.Application()
+    
+    app.init({
+      width,
+      height,
+      backgroundColor: 0x000000,
+      antialias: true,
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
+    }).then(() => {
+      container.appendChild(app.canvas)
+      appRef.current = app
 
-    // Vertex Shader
-    const vertexShaderSource = `
-      attribute vec2 a_position;
-      attribute vec2 a_texCoord;
-      varying vec2 v_texCoord;
-      void main() {
-        gl_Position = vec4(a_position, 0.0, 1.0);
-        v_texCoord = a_texCoord;
+      // 메인 컨테이너 생성
+      const mainContainer = new PIXI.Container()
+      app.stage.addChild(mainContainer)
+      containerRef.current = mainContainer
+    }).catch((error) => {
+      console.error('Failed to initialize PixiJS:', error)
+    })
+
+    return () => {
+      if (appRef.current) {
+        appRef.current.destroy(true, { children: true, texture: true })
+        appRef.current = null
       }
-    `
-
-    // Fragment Shader (전환 효과 포함)
-    const fragmentShaderSource = `
-      precision mediump float;
-      uniform sampler2D u_texture1;
-      uniform sampler2D u_texture2;
-      uniform float u_progress;
-      uniform int u_transition;
-      uniform vec2 u_resolution;
-      varying vec2 v_texCoord;
-
-      // Fade
-      vec4 fade() {
-        vec4 color1 = texture2D(u_texture1, v_texCoord);
-        vec4 color2 = texture2D(u_texture2, v_texCoord);
-        return mix(color1, color2, u_progress);
-      }
-
-      // Slide Left
-      vec4 slideLeft() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        if (coord.x < u_progress) {
-          return color2;
-        }
-        return color1;
-      }
-
-      // Slide Right
-      vec4 slideRight() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        if (coord.x > 1.0 - u_progress) {
-          return color2;
-        }
-        return color1;
-      }
-
-      // Slide Up
-      vec4 slideUp() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        if (coord.y < u_progress) {
-          return color2;
-        }
-        return color1;
-      }
-
-      // Slide Down
-      vec4 slideDown() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        if (coord.y > 1.0 - u_progress) {
-          return color2;
-        }
-        return color1;
-      }
-
-      // Zoom In
-      vec4 zoomIn() {
-        vec2 coord = v_texCoord;
-        vec2 center = vec2(0.5, 0.5);
-        vec2 offset = (coord - center) * (1.0 - u_progress);
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, center + offset);
-        return mix(color1, color2, u_progress);
-      }
-
-      // Zoom Out
-      vec4 zoomOut() {
-        vec2 coord = v_texCoord;
-        vec2 center = vec2(0.5, 0.5);
-        vec2 offset = (coord - center) * u_progress;
-        vec4 color1 = texture2D(u_texture1, center + offset);
-        vec4 color2 = texture2D(u_texture2, coord);
-        return mix(color1, color2, u_progress);
-      }
-
-      // Wipe Left
-      vec4 wipeLeft() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        float edge = smoothstep(u_progress - 0.1, u_progress, coord.x);
-        return mix(color1, color2, edge);
-      }
-
-      // Wipe Right
-      vec4 wipeRight() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        float edge = smoothstep(1.0 - u_progress - 0.1, 1.0 - u_progress, coord.x);
-        return mix(color1, color2, edge);
-      }
-
-      // Blur
-      vec4 blur() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        float blurAmount = u_progress * 0.1;
-        vec4 blurred1 = color1;
-        vec4 blurred2 = color2;
-        for (int i = -2; i <= 2; i++) {
-          for (int j = -2; j <= 2; j++) {
-            vec2 offset = vec2(float(i), float(j)) * blurAmount / u_resolution;
-            blurred1 += texture2D(u_texture1, coord + offset);
-            blurred2 += texture2D(u_texture2, coord + offset);
-          }
-        }
-        blurred1 /= 25.0;
-        blurred2 /= 25.0;
-        return mix(blurred1, blurred2, u_progress);
-      }
-
-      // Glitch
-      vec4 glitch() {
-        vec2 coord = v_texCoord;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        float glitchAmount = sin(u_progress * 20.0) * 0.02;
-        vec2 glitchCoord = coord + vec2(glitchAmount, 0.0);
-        vec4 glitched = texture2D(u_texture2, glitchCoord);
-        return mix(color1, glitched, u_progress);
-      }
-
-      // Rotate
-      vec4 rotate() {
-        vec2 coord = v_texCoord - 0.5;
-        float angle = u_progress * 3.14159;
-        float c = cos(angle);
-        float s = sin(angle);
-        vec2 rotated = vec2(
-          coord.x * c - coord.y * s,
-          coord.x * s + coord.y * c
-        ) + 0.5;
-        vec4 color1 = texture2D(u_texture1, v_texCoord);
-        vec4 color2 = texture2D(u_texture2, rotated);
-        return mix(color1, color2, u_progress);
-      }
-
-      // Pixelate
-      vec4 pixelate() {
-        vec2 coord = v_texCoord;
-        float pixelSize = mix(1.0, 20.0, u_progress);
-        vec2 pixelated = floor(coord * pixelSize) / pixelSize;
-        vec4 color1 = texture2D(u_texture1, v_texCoord);
-        vec4 color2 = texture2D(u_texture2, pixelated);
-        return mix(color1, color2, u_progress);
-      }
-
-      // Wave
-      vec4 wave() {
-        vec2 coord = v_texCoord;
-        float waveAmount = sin(coord.y * 10.0 + u_progress * 10.0) * 0.02 * u_progress;
-        vec2 waved = coord + vec2(waveAmount, 0.0);
-        vec4 color1 = texture2D(u_texture1, v_texCoord);
-        vec4 color2 = texture2D(u_texture2, waved);
-        return mix(color1, color2, u_progress);
-      }
-
-      // Ripple
-      vec4 ripple() {
-        vec2 coord = v_texCoord;
-        vec2 center = vec2(0.5, 0.5);
-        float dist = distance(coord, center);
-        float ripple = sin(dist * 20.0 - u_progress * 10.0) * 0.02 * u_progress;
-        vec2 rippled = coord + normalize(coord - center) * ripple;
-        vec4 color1 = texture2D(u_texture1, v_texCoord);
-        vec4 color2 = texture2D(u_texture2, rippled);
-        return mix(color1, color2, u_progress);
-      }
-
-      // Circle
-      vec4 circle() {
-        vec2 coord = v_texCoord;
-        vec2 center = vec2(0.5, 0.5);
-        float dist = distance(coord, center);
-        float radius = u_progress * 1.5;
-        vec4 color1 = texture2D(u_texture1, coord);
-        vec4 color2 = texture2D(u_texture2, coord);
-        float edge = smoothstep(radius - 0.1, radius, dist);
-        return mix(color1, color2, 1.0 - edge);
-      }
-
-      // Crossfade
-      vec4 crossfade() {
-        vec4 color1 = texture2D(u_texture1, v_texCoord);
-        vec4 color2 = texture2D(u_texture2, v_texCoord);
-        float eased = u_progress * u_progress * (3.0 - 2.0 * u_progress);
-        return mix(color1, color2, eased);
-      }
-
-      void main() {
-        if (u_transition == 0) gl_FragColor = fade();
-        else if (u_transition == 1) gl_FragColor = slideLeft();
-        else if (u_transition == 2) gl_FragColor = slideRight();
-        else if (u_transition == 3) gl_FragColor = slideUp();
-        else if (u_transition == 4) gl_FragColor = slideDown();
-        else if (u_transition == 5) gl_FragColor = zoomIn();
-        else if (u_transition == 6) gl_FragColor = zoomOut();
-        else if (u_transition == 7) gl_FragColor = wipeLeft();
-        else if (u_transition == 8) gl_FragColor = wipeRight();
-        else if (u_transition == 9) gl_FragColor = blur();
-        else if (u_transition == 10) gl_FragColor = glitch();
-        else if (u_transition == 11) gl_FragColor = rotate();
-        else if (u_transition == 12) gl_FragColor = pixelate();
-        else if (u_transition == 13) gl_FragColor = wave();
-        else if (u_transition == 14) gl_FragColor = ripple();
-        else if (u_transition == 15) gl_FragColor = circle();
-        else if (u_transition == 16) gl_FragColor = crossfade();
-        else gl_FragColor = fade();
-      }
-    `
-
-    const compileShader = (source: string, type: number): WebGLShader | null => {
-      const shader = gl.createShader(type)
-      if (!shader) return null
-      gl.shaderSource(shader, source)
-      gl.compileShader(shader)
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Shader compile error:', gl.getShaderInfoLog(shader))
-        gl.deleteShader(shader)
-        return null
-      }
-      return shader
     }
+  }, [stageDimensions])
 
-    const vertexShader = compileShader(vertexShaderSource, gl.VERTEX_SHADER)
-    const fragmentShader = compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
-    if (!vertexShader || !fragmentShader) return
+  // 이미지 fit 방식에 따른 스프라이트 크기 및 위치 계산
+  const calculateSpriteParams = (
+    textureWidth: number,
+    textureHeight: number,
+    stageWidth: number,
+    stageHeight: number,
+    fit: 'cover' | 'contain' | 'fill'
+  ) => {
+    const imgAspect = textureWidth / textureHeight
+    const stageAspect = stageWidth / stageHeight
 
-    const program = gl.createProgram()
-    if (!program) return
-    gl.attachShader(program, vertexShader)
-    gl.attachShader(program, fragmentShader)
-    gl.linkProgram(program)
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Program link error:', gl.getProgramInfoLog(program))
-      return
+    if (fit === 'fill') {
+      return { x: 0, y: 0, width: stageWidth, height: stageHeight, scale: 1 }
+    } else if (fit === 'cover') {
+      let scale: number
+      if (imgAspect > stageAspect) {
+        scale = stageHeight / textureHeight
+      } else {
+        scale = stageWidth / textureWidth
+      }
+      const width = textureWidth * scale
+      const height = textureHeight * scale
+      return {
+        x: (stageWidth - width) / 2,
+        y: (stageHeight - height) / 2,
+        width,
+        height,
+        scale,
+      }
+    } else {
+      // contain
+      let scale: number
+      if (imgAspect > stageAspect) {
+        scale = stageWidth / textureWidth
+      } else {
+        scale = stageHeight / textureHeight
+      }
+      const width = textureWidth * scale
+      const height = textureHeight * scale
+      return {
+        x: (stageWidth - width) / 2,
+        y: (stageHeight - height) / 2,
+        width,
+        height,
+        scale,
+      }
     }
+  }
 
-    programRef.current = program
-
-    // Quad vertices
-    const positions = new Float32Array([
-      -1, -1, 0, 1,
-       1, -1, 1, 1,
-      -1,  1, 0, 0,
-       1,  1, 1, 0,
-    ])
-
-    const buffer = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW)
-
-    const positionLoc = gl.getAttribLocation(program, 'a_position')
-    const texCoordLoc = gl.getAttribLocation(program, 'a_texCoord')
-
-    gl.enableVertexAttribArray(positionLoc)
-    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 16, 0)
-    gl.enableVertexAttribArray(texCoordLoc)
-    gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 16, 8)
-
-    gl.useProgram(program)
-    gl.viewport(0, 0, canvas.width, canvas.height)
-  }, [])
-
-  // 텍스처 로드 함수
-  const loadTexture = (gl: WebGLRenderingContext, url: string): Promise<WebGLTexture> => {
+  // PixiJS 텍스처 로드 함수
+  const loadPixiTexture = (url: string): Promise<PIXI.Texture> => {
     return new Promise((resolve, reject) => {
       if (texturesRef.current.has(url)) {
         resolve(texturesRef.current.get(url)!)
         return
       }
 
-      const texture = gl.createTexture()
-      if (!texture) {
-        reject(new Error('Failed to create texture'))
-        return
-      }
-
-      gl.bindTexture(gl.TEXTURE_2D, texture)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.onload = () => {
-        gl.bindTexture(gl.TEXTURE_2D, texture)
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+      // Assets API 사용
+      PIXI.Assets.load(url).then((texture) => {
         texturesRef.current.set(url, texture)
         resolve(texture)
-      }
-      img.onerror = () => reject(new Error('Failed to load image'))
-      img.src = url
+      }).catch((error) => {
+        reject(new Error(`Failed to load image: ${url} - ${error}`))
+      })
     })
   }
 
-  // 전환 효과 이름을 숫자로 매핑
-  const getTransitionIndex = (transition: string): number => {
-    const map: Record<string, number> = {
-      fade: 0,
-      'slide-left': 1,
-      'slide-right': 2,
-      'slide-up': 3,
-      'slide-down': 4,
-      'zoom-in': 5,
-      'zoom-out': 6,
-      'wipe-left': 7,
-      'wipe-right': 8,
-      blur: 9,
-      glitch: 10,
-      rotate: 11,
-      pixelate: 12,
-      wave: 13,
-      ripple: 14,
-      circle: 15,
-      crossfade: 16,
+  // PixiJS로 씬 렌더링
+  useEffect(() => {
+    if (!appRef.current || !containerRef.current || !timeline) return
+
+    const app = appRef.current
+    const container = containerRef.current
+    const { width, height } = stageDimensions
+
+    // 기존 스프라이트와 텍스트 제거
+    container.removeChildren()
+    spritesRef.current.clear()
+    textsRef.current.clear()
+
+    // 모든 씬의 이미지와 텍스트 미리 로드
+    const loadScene = async (sceneIndex: number) => {
+      const scene = timeline.scenes[sceneIndex]
+      if (!scene || !scene.image) return
+
+      try {
+        const texture = await loadPixiTexture(scene.image)
+        const sprite = new PIXI.Sprite(texture)
+        const imageFit = scene.imageFit || 'cover'
+        const params = calculateSpriteParams(
+          texture.width,
+          texture.height,
+          width,
+          height,
+          imageFit
+        )
+
+        sprite.x = params.x
+        sprite.y = params.y
+        sprite.width = params.width
+        sprite.height = params.height
+        sprite.anchor.set(0, 0)
+        sprite.visible = false
+        sprite.alpha = 0
+
+        container.addChild(sprite)
+        spritesRef.current.set(sceneIndex, sprite)
+
+        // 텍스트 생성
+        if (scene.text?.content) {
+          const textStyle = new PIXI.TextStyle({
+            fontFamily: scene.text.font || 'Arial',
+            fontSize: scene.text.fontSize || 32,
+            fill: scene.text.color || '#ffffff',
+            align: 'center',
+            dropShadow: {
+              color: '#000000',
+              blur: 10,
+              angle: Math.PI / 4,
+              distance: 2,
+            },
+          })
+
+          const text = new PIXI.Text({
+            text: scene.text.content,
+            style: textStyle,
+          })
+
+          text.anchor.set(0.5, 0.5)
+          let textY = height / 2
+          if (scene.text.position === 'top') {
+            textY = 200
+          } else if (scene.text.position === 'bottom') {
+            textY = height - 200
+          }
+          text.x = width / 2
+          text.y = textY
+          text.visible = false
+          text.alpha = 0
+
+          container.addChild(text)
+          textsRef.current.set(sceneIndex, text)
+        }
+      } catch (error) {
+        console.error(`Failed to load scene ${sceneIndex}:`, error)
+      }
     }
-    return map[transition] ?? 0
+
+    // 모든 씬 로드
+    Promise.all(timeline.scenes.map((_, index) => loadScene(index))).then(() => {
+      // 현재 씬 표시
+      updateCurrentScene()
+    })
+  }, [timeline, stageDimensions])
+
+  // 현재 씬 업데이트 (애니메이션 없이)
+  const updateCurrentScene = () => {
+    if (!containerRef.current || !timeline) return
+
+    // 모든 스프라이트와 텍스트 숨기기
+    spritesRef.current.forEach((sprite) => {
+      sprite.visible = false
+      sprite.alpha = 0
+    })
+    textsRef.current.forEach((text) => {
+      text.visible = false
+      text.alpha = 0
+    })
+
+    // 현재 씬 표시
+    const currentSprite = spritesRef.current.get(currentSceneIndex)
+    const currentText = textsRef.current.get(currentSceneIndex)
+
+    if (currentSprite) {
+      currentSprite.visible = true
+      currentSprite.alpha = 1
+    }
+    if (currentText) {
+      currentText.visible = true
+      currentText.alpha = 1
+    }
   }
 
-  // WebGL 렌더링 (WebGL 미지원 시 Canvas 2D fallback)
   useEffect(() => {
-    if (!canvasRef.current || !timeline) return
-
-    const canvas = canvasRef.current
-    const scene = timeline.scenes[currentSceneIndex]
-    if (!scene) return
-
-    // WebGL이 지원되는 경우
-    if (glRef.current && programRef.current) {
-      const gl = glRef.current
-      const program = programRef.current
-      const nextSceneIndex = currentSceneIndex + 1
-      const nextScene = timeline.scenes[nextSceneIndex]
-
-      // 현재 씬과 다음 씬의 전환 진행도 계산
-      const sceneStartTime = timeline.scenes
-        .slice(0, currentSceneIndex)
-        .reduce((acc, s) => acc + s.duration, 0)
-      const sceneEndTime = sceneStartTime + scene.duration
-      const transitionDuration = 0.3 // 전환 시간 0.3초
-      const transitionStartTime = sceneEndTime - transitionDuration
-      let progress = 0
-
-      if (nextScene && currentTime >= transitionStartTime && currentTime <= sceneEndTime) {
-        progress = (currentTime - transitionStartTime) / transitionDuration
-        progress = Math.max(0, Math.min(1, progress))
-      }
-
-      setTransitionProgress(progress)
-
-      const render = async () => {
-        try {
-          const texture1 = await loadTexture(gl, scene.image)
-          const texture2 = nextScene ? await loadTexture(gl, nextScene.image) : texture1
-
-          gl.useProgram(program)
-          gl.clearColor(0, 0, 0, 1)
-          gl.clear(gl.COLOR_BUFFER_BIT)
-
-          gl.activeTexture(gl.TEXTURE0)
-          gl.bindTexture(gl.TEXTURE_2D, texture1)
-          gl.uniform1i(gl.getUniformLocation(program, 'u_texture1'), 0)
-
-          gl.activeTexture(gl.TEXTURE1)
-          gl.bindTexture(gl.TEXTURE_2D, texture2)
-          gl.uniform1i(gl.getUniformLocation(program, 'u_texture2'), 1)
-
-          const transitionIndex = getTransitionIndex(scene.transition)
-          gl.uniform1i(gl.getUniformLocation(program, 'u_transition'), transitionIndex)
-          gl.uniform1f(gl.getUniformLocation(program, 'u_progress'), progress)
-          gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), 1080, 1920)
-
-          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-
-          // 텍스트는 Canvas 2D로 오버레이
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height)
-            if (scene.text.content) {
-              ctx.fillStyle = scene.text.color
-              ctx.font = `${scene.text.fontSize || 32}px ${scene.text.font}`
-              ctx.textAlign = 'center'
-              ctx.textBaseline = 'middle'
-
-              let textX = canvas.width / 2
-              let textY = canvas.height / 2
-
-              if (scene.text.position === 'top') {
-                textY = 200
-              } else if (scene.text.position === 'bottom') {
-                textY = canvas.height - 200
-              }
-
-              ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
-              ctx.shadowBlur = 10
-              ctx.shadowOffsetX = 2
-              ctx.shadowOffsetY = 2
-
-              ctx.fillText(scene.text.content, textX, textY)
-
-              ctx.shadowColor = 'transparent'
-              ctx.shadowBlur = 0
-              ctx.shadowOffsetX = 0
-              ctx.shadowOffsetY = 0
-            }
-          }
-        } catch (error) {
-          console.error('WebGL render error:', error)
-          // WebGL 실패 시 Canvas 2D로 fallback
-          renderCanvas2D()
-        }
-      }
-
-      render()
-    } else {
-      // WebGL 미지원 시 Canvas 2D로 렌더링
-      renderCanvas2D()
-    }
-
-    function renderCanvas2D() {
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-
-      canvas.width = 1080
-      canvas.height = 1920
-
-      if (scene.image) {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-          // 이미지 그리기 (비율 유지)
-          const imgAspect = img.width / img.height
-          const canvasAspect = canvas.width / canvas.height
-
-          let drawWidth = canvas.width
-          let drawHeight = canvas.height
-          let drawX = 0
-          let drawY = 0
-
-          if (imgAspect > canvasAspect) {
-            drawHeight = canvas.width / imgAspect
-            drawY = (canvas.height - drawHeight) / 2
-          } else {
-            drawWidth = canvas.height * imgAspect
-            drawX = (canvas.width - drawWidth) / 2
-          }
-
-          ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
-
-          // 텍스트 오버레이
-          if (scene.text.content) {
-            ctx.fillStyle = scene.text.color
-            ctx.font = `${scene.text.fontSize || 32}px ${scene.text.font}`
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-
-            let textX = canvas.width / 2
-            let textY = canvas.height / 2
-
-            if (scene.text.position === 'top') {
-              textY = 200
-            } else if (scene.text.position === 'bottom') {
-              textY = canvas.height - 200
-            }
-
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
-            ctx.shadowBlur = 10
-            ctx.shadowOffsetX = 2
-            ctx.shadowOffsetY = 2
-
-            ctx.fillText(scene.text.content, textX, textY)
-
-            ctx.shadowColor = 'transparent'
-            ctx.shadowBlur = 0
-            ctx.shadowOffsetX = 0
-            ctx.shadowOffsetY = 0
-          }
-        }
-        img.src = scene.image
-      }
-    }
-  }, [timeline, currentSceneIndex, currentTime, transitionProgress])
+    updateCurrentScene()
+  }, [currentSceneIndex])
 
   // 재생/일시정지
   const handlePlayPause = () => {
@@ -610,76 +362,318 @@ export default function Step4Page() {
 
   // Scene 클릭 시 해당 씬으로 이동
   const handleSceneSelect = (index: number) => {
-    if (!timeline) return
-    setCurrentSceneIndex(index)
+    if (!timeline || !gsapTimelineRef.current) return
+    
+    // 재생 중이면 일시정지
+    if (isPlaying) {
+      setIsPlaying(false)
+    }
 
-    // 선택한 씬의 시작 시점으로 currentTime 이동
-    const timeUntilScene = timeline.scenes
-      .slice(0, index)
-      .reduce((acc, scene) => acc + scene.duration, 0)
+    // 선택한 씬의 시작 시점 계산
+    let timeUntilScene = 0
+    for (let i = 0; i < index; i++) {
+      timeUntilScene += timeline.scenes[i].duration + (timeline.scenes[i].transitionDuration || 0.5)
+    }
+
+    // GSAP Timeline 위치 설정
+    const totalDuration = timeline.scenes.reduce(
+      (acc, scene) => acc + scene.duration + (scene.transitionDuration || 0.5),
+      0
+    )
+    const progress = totalDuration > 0 ? timeUntilScene / totalDuration : 0
+    gsapTimelineRef.current.progress(progress)
+    
+    setCurrentSceneIndex(index)
     setCurrentTime(timeUntilScene)
+    updateCurrentScene()
   }
 
-  // 재생 루프
-  useEffect(() => {
-    if (!isPlaying || !timeline) return
+  // 전환 효과 적용 함수
+  const applyTransition = (
+    fromSprite: PIXI.Sprite | undefined,
+    toSprite: PIXI.Sprite | undefined,
+    fromText: PIXI.Text | undefined,
+    toText: PIXI.Text | undefined,
+    transition: string,
+    duration: number
+  ) => {
+    if (!fromSprite && !toSprite) return
 
-    const totalDuration = timeline.scenes.reduce(
-      (acc, scene) => acc + scene.duration,
-      0,
-    )
+    const tl = gsap.timeline()
 
-    let lastTimestamp: number | null = null
-
-    const tick = (timestamp: number) => {
-      if (!lastTimestamp) {
-        lastTimestamp = timestamp
+    // 기본값: fade
+    if (transition === 'fade' || !transition) {
+      if (fromSprite) {
+        tl.to(fromSprite, { alpha: 0, duration, ease: 'none' })
       }
-      const deltaSeconds = (timestamp - lastTimestamp) / 1000
-      lastTimestamp = timestamp
+      if (toSprite) {
+        toSprite.alpha = 0
+        toSprite.visible = true
+        tl.to(toSprite, { alpha: 1, duration, ease: 'none' }, 0)
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+      if (toText) {
+        toText.alpha = 0
+        toText.visible = true
+        tl.to(toText, { alpha: 1, duration, ease: 'none' }, 0)
+      }
+    } else if (transition === 'slide-left') {
+      if (toSprite) {
+        toSprite.x = stageDimensions.width
+        toSprite.visible = true
+        toSprite.alpha = 1
+        tl.to(toSprite, { x: 0, duration, ease: 'power2.inOut' })
+      }
+      if (fromSprite) {
+        tl.to(fromSprite, { x: -stageDimensions.width, duration, ease: 'power2.inOut' }, 0)
+      }
+      if (toText) {
+        toText.visible = true
+        toText.alpha = 1
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+    } else if (transition === 'slide-right') {
+      if (toSprite) {
+        toSprite.x = -stageDimensions.width
+        toSprite.visible = true
+        toSprite.alpha = 1
+        tl.to(toSprite, { x: 0, duration, ease: 'power2.inOut' })
+      }
+      if (fromSprite) {
+        tl.to(fromSprite, { x: stageDimensions.width, duration, ease: 'power2.inOut' }, 0)
+      }
+      if (toText) {
+        toText.visible = true
+        toText.alpha = 1
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+    } else if (transition === 'slide-up') {
+      if (toSprite) {
+        toSprite.y = stageDimensions.height
+        toSprite.visible = true
+        toSprite.alpha = 1
+        tl.to(toSprite, { y: 0, duration, ease: 'power2.inOut' })
+      }
+      if (fromSprite) {
+        tl.to(fromSprite, { y: -stageDimensions.height, duration, ease: 'power2.inOut' }, 0)
+      }
+      if (toText) {
+        toText.visible = true
+        toText.alpha = 1
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+    } else if (transition === 'slide-down') {
+      if (toSprite) {
+        toSprite.y = -stageDimensions.height
+        toSprite.visible = true
+        toSprite.alpha = 1
+        tl.to(toSprite, { y: 0, duration, ease: 'power2.inOut' })
+      }
+      if (fromSprite) {
+        tl.to(fromSprite, { y: stageDimensions.height, duration, ease: 'power2.inOut' }, 0)
+      }
+      if (toText) {
+        toText.visible = true
+        toText.alpha = 1
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+    } else if (transition === 'zoom-in') {
+      if (toSprite) {
+        toSprite.scale.set(0)
+        toSprite.visible = true
+        toSprite.alpha = 1
+        tl.to(toSprite.scale, { x: 1, y: 1, duration, ease: 'power2.out' })
+      }
+      if (fromSprite) {
+        tl.to(fromSprite, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+      if (toText) {
+        toText.visible = true
+        toText.alpha = 1
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+    } else if (transition === 'zoom-out') {
+      if (toSprite) {
+        toSprite.scale.set(2)
+        toSprite.visible = true
+        toSprite.alpha = 1
+        tl.to(toSprite.scale, { x: 1, y: 1, duration, ease: 'power2.in' })
+      }
+      if (fromSprite) {
+        tl.to(fromSprite, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+      if (toText) {
+        toText.visible = true
+        toText.alpha = 1
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+    } else if (transition === 'rotate') {
+      if (toSprite) {
+        toSprite.rotation = Math.PI * 2
+        toSprite.visible = true
+        toSprite.alpha = 1
+        tl.to(toSprite, { rotation: 0, duration, ease: 'power2.inOut' })
+      }
+      if (fromSprite) {
+        tl.to(fromSprite, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+      if (toText) {
+        toText.visible = true
+        toText.alpha = 1
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+    } else {
+      // 기본 fade
+      if (fromSprite) {
+        tl.to(fromSprite, { alpha: 0, duration, ease: 'none' })
+      }
+      if (toSprite) {
+        toSprite.alpha = 0
+        toSprite.visible = true
+        tl.to(toSprite, { alpha: 1, duration, ease: 'none' }, 0)
+      }
+      if (fromText) {
+        tl.to(fromText, { alpha: 0, duration, ease: 'none' }, 0)
+      }
+      if (toText) {
+        toText.alpha = 0
+        toText.visible = true
+        tl.to(toText, { alpha: 1, duration, ease: 'none' }, 0)
+      }
+    }
 
-      setCurrentTime((prev) => {
-        let next = prev + deltaSeconds
+    // 전환 완료 후 이전 스프라이트 숨기기
+    tl.call(() => {
+      if (fromSprite) {
+        fromSprite.visible = false
+        fromSprite.alpha = 0
+        fromSprite.x = 0
+        fromSprite.y = 0
+        fromSprite.scale.set(1)
+        fromSprite.rotation = 0
+      }
+      if (fromText) {
+        fromText.visible = false
+        fromText.alpha = 0
+      }
+    })
+  }
 
-        if (next >= totalDuration) {
-          setIsPlaying(false)
-          next = totalDuration
-        }
+  // GSAP Timeline으로 재생 루프 구성
+  useEffect(() => {
+    if (!timeline || !containerRef.current) return
 
-        // 현재 시간에 해당하는 씬 인덱스 계산
+    // 기존 타임라인 정리
+    if (gsapTimelineRef.current) {
+      gsapTimelineRef.current.kill()
+      gsapTimelineRef.current = null
+    }
+
+    const masterTimeline = gsap.timeline({
+      paused: true,
+      onUpdate: () => {
+        const progress = masterTimeline.progress()
+        const totalDuration = timeline.scenes.reduce(
+          (acc, scene) => acc + scene.duration + (scene.transitionDuration || 0.5),
+          0
+        )
+        const currentTime = progress * totalDuration
+        setCurrentTime(currentTime)
+
+        // 현재 씬 인덱스 계산
         let accumulated = 0
         let sceneIndex = 0
         for (let i = 0; i < timeline.scenes.length; i++) {
-          accumulated += timeline.scenes[i].duration
-          if (next <= accumulated) {
+          const sceneDuration = timeline.scenes[i].duration + (timeline.scenes[i].transitionDuration || 0.5)
+          accumulated += sceneDuration
+          if (currentTime <= accumulated) {
             sceneIndex = i
             break
           }
         }
         setCurrentSceneIndex(sceneIndex)
+      },
+      onComplete: () => {
+        setIsPlaying(false)
+      },
+    })
 
-        return next
-      })
+    // 각 씬에 대한 애니메이션 추가
+    let currentTime = 0
+    timeline.scenes.forEach((scene, index) => {
+      const fromSprite = spritesRef.current.get(index - 1)
+      const toSprite = spritesRef.current.get(index)
+      const fromText = textsRef.current.get(index - 1)
+      const toText = textsRef.current.get(index)
 
-      if (animationFrameRef.current !== undefined && isPlaying) {
-        animationFrameRef.current = requestAnimationFrame(tick)
+      const transitionDuration = scene.transitionDuration || 0.5
+
+      // 씬 시작 시 전환 효과 적용
+      if (index > 0 && fromSprite && toSprite) {
+        const transition = timeline.scenes[index - 1].transition || 'fade'
+        masterTimeline.call(() => {
+          applyTransition(fromSprite, toSprite, fromText, toText, transition, transitionDuration)
+        }, [], currentTime)
+        currentTime += transitionDuration
+      } else if (toSprite) {
+        // 첫 번째 씬
+        masterTimeline.call(() => {
+          if (toSprite) {
+            toSprite.visible = true
+            toSprite.alpha = 1
+          }
+          if (toText) {
+            toText.visible = true
+            toText.alpha = 1
+          }
+        }, [], currentTime)
       }
-    }
 
-    animationFrameRef.current = requestAnimationFrame(tick)
+      // 씬 지속 시간
+      currentTime += scene.duration
+    })
+
+    gsapTimelineRef.current = masterTimeline
 
     return () => {
-      if (animationFrameRef.current !== undefined) {
-        cancelAnimationFrame(animationFrameRef.current)
+      if (masterTimeline) {
+        masterTimeline.kill()
       }
     }
-  }, [isPlaying, timeline])
+  }, [timeline, stageDimensions])
+
+  // 재생/일시정지 제어
+  useEffect(() => {
+    if (!gsapTimelineRef.current) return
+
+    if (isPlaying) {
+      gsapTimelineRef.current.play()
+    } else {
+      gsapTimelineRef.current.pause()
+    }
+  }, [isPlaying])
 
   // 전체 재생 길이와 현재 위치 비율
   const progressRatio = useMemo(() => {
     if (!timeline || timeline.scenes.length === 0) return 0
     const total = timeline.scenes.reduce(
-      (acc, scene) => acc + scene.duration,
+      (acc, scene) => acc + scene.duration + (scene.transitionDuration || 0.5),
       0,
     )
     if (total === 0) return 0
@@ -719,6 +713,18 @@ export default function Step4Page() {
     setTimeline(nextTimeline)
   }
 
+  // 씬 이미지 fit 방식 수정
+  const handleSceneImageFitChange = (index: number, value: 'cover' | 'contain' | 'fill') => {
+    if (!timeline) return
+    const nextTimeline: TimelineData = {
+      ...timeline,
+      scenes: timeline.scenes.map((scene, i) =>
+        i === index ? { ...scene, imageFit: value } : scene,
+      ),
+    }
+    setTimeline(nextTimeline)
+  }
+
   // 씬 재생 시간(duration) 수정
   const handleSceneDurationChange = (index: number, value: number) => {
     if (!timeline) return
@@ -732,14 +738,34 @@ export default function Step4Page() {
     setTimeline(nextTimeline)
     
     // 재생 중이면 현재 시간도 조정
-    if (isPlaying) {
+    if (isPlaying && gsapTimelineRef.current) {
       const timeUntilScene = nextTimeline.scenes
         .slice(0, index)
-        .reduce((acc, scene) => acc + scene.duration, 0)
+        .reduce((acc, scene) => acc + scene.duration + (scene.transitionDuration || 0.5), 0)
+      const totalDuration = nextTimeline.scenes.reduce(
+        (acc, scene) => acc + scene.duration + (scene.transitionDuration || 0.5),
+        0
+      )
       if (currentTime > timeUntilScene + clampedValue) {
-        setCurrentTime(timeUntilScene + clampedValue)
+        const newTime = timeUntilScene + clampedValue
+        const progress = totalDuration > 0 ? newTime / totalDuration : 0
+        gsapTimelineRef.current.progress(progress)
+        setCurrentTime(newTime)
       }
     }
+  }
+
+  // 씬 전환 시간 수정
+  const handleSceneTransitionDurationChange = (index: number, value: number) => {
+    if (!timeline) return
+    const clampedValue = Math.max(0.1, Math.min(2, value)) // 0.1초 ~ 2초 제한
+    const nextTimeline: TimelineData = {
+      ...timeline,
+      scenes: timeline.scenes.map((scene, i) =>
+        i === index ? { ...scene, transitionDuration: clampedValue } : scene,
+      ),
+    }
+    setTimeline(nextTimeline)
   }
 
   // 타임라인 바 클릭/드래그로 위치 이동
@@ -757,44 +783,56 @@ export default function Step4Page() {
   }
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!timeline || !timelineBarRef.current) return
+    if (!timeline || !timelineBarRef.current || !gsapTimelineRef.current) return
     
     const rect = timelineBarRef.current.getBoundingClientRect()
     const clickX = e.clientX - rect.left
     const ratio = Math.max(0, Math.min(1, clickX / rect.width))
     
+    // 재생 중이면 일시정지
+    if (isPlaying) {
+      setIsPlaying(false)
+    }
+
+    // GSAP Timeline 위치 설정
+    gsapTimelineRef.current.progress(ratio)
+    
     const totalDuration = timeline.scenes.reduce(
-      (acc, scene) => acc + scene.duration,
-      0,
+      (acc, scene) => acc + scene.duration + (scene.transitionDuration || 0.5),
+      0
     )
     const targetTime = ratio * totalDuration
-    
     setCurrentTime(targetTime)
     
     // 해당 시간에 맞는 씬 인덱스 계산
     let accumulated = 0
     let sceneIndex = 0
     for (let i = 0; i < timeline.scenes.length; i++) {
-      accumulated += timeline.scenes[i].duration
+      const sceneDuration = timeline.scenes[i].duration + (timeline.scenes[i].transitionDuration || 0.5)
+      accumulated += sceneDuration
       if (targetTime <= accumulated) {
         sceneIndex = i
         break
       }
     }
     setCurrentSceneIndex(sceneIndex)
+    updateCurrentScene()
   }
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDraggingTimeline || !timeline || !timelineBarRef.current) return
+      if (!isDraggingTimeline || !timeline || !timelineBarRef.current || !gsapTimelineRef.current) return
       
       const rect = timelineBarRef.current.getBoundingClientRect()
       const mouseX = e.clientX - rect.left
       const ratio = Math.max(0, Math.min(1, mouseX / rect.width))
       
+      // GSAP Timeline 위치 설정
+      gsapTimelineRef.current.progress(ratio)
+      
       const totalDuration = timeline.scenes.reduce(
-        (acc, scene) => acc + scene.duration,
-        0,
+        (acc, scene) => acc + scene.duration + (scene.transitionDuration || 0.5),
+        0
       )
       const targetTime = ratio * totalDuration
       
@@ -804,13 +842,15 @@ export default function Step4Page() {
       let accumulated = 0
       let sceneIndex = 0
       for (let i = 0; i < timeline.scenes.length; i++) {
-        accumulated += timeline.scenes[i].duration
+        const sceneDuration = timeline.scenes[i].duration + (timeline.scenes[i].transitionDuration || 0.5)
+        accumulated += sceneDuration
         if (targetTime <= accumulated) {
           sceneIndex = i
           break
         }
       }
       setCurrentSceneIndex(sceneIndex)
+      updateCurrentScene()
     }
 
     const handleMouseUp = () => {
@@ -896,11 +936,57 @@ export default function Step4Page() {
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
                     <div className="flex-1 flex flex-col gap-3 md:gap-4 justify-center items-center">
+                      {/* 비율 선택 */}
+                      <div className="w-full px-2 space-y-3">
+                        <div>
+                          <label className={`block text-xs md:text-sm mb-1.5 ${
+                            theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
+                            비율 선택
+                          </label>
+                          <select
+                            value={aspectRatio}
+                            onChange={(e) => setAspectRatio(e.target.value)}
+                            className={`w-full text-xs md:text-sm rounded-md border px-2 py-1.5 ${
+                              theme === 'dark'
+                                ? 'bg-gray-800 border-gray-700 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
+                            } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                          >
+                            <option value="9/16">9:16 (세로, 스토리/쇼츠)</option>
+                            <option value="16/9">16:9 (가로, 유튜브)</option>
+                            <option value="1/1">1:1 (정사각형, 인스타그램)</option>
+                            <option value="4/3">4:3 (전통)</option>
+                          </select>
+                        </div>
+                        {timeline && timeline.scenes[currentSceneIndex] && (
+                          <div>
+                            <label className={`block text-xs md:text-sm mb-1.5 ${
+                              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                            }`}>
+                              이미지 표시 방식 (Scene {currentSceneIndex + 1})
+                            </label>
+                            <select
+                              value={timeline.scenes[currentSceneIndex].imageFit || 'cover'}
+                              onChange={(e) => handleSceneImageFitChange(currentSceneIndex, e.target.value as 'cover' | 'contain' | 'fill')}
+                              className={`w-full text-xs md:text-sm rounded-md border px-2 py-1.5 ${
+                                theme === 'dark'
+                                  ? 'bg-gray-800 border-gray-700 text-white'
+                                  : 'bg-white border-gray-300 text-gray-900'
+                              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                            >
+                              <option value="cover">Cover (채우기, 일부 잘릴 수 있음)</option>
+                              <option value="contain">Contain (전체 보이기, 여백 생길 수 있음)</option>
+                              <option value="fill">Fill (늘리기, 비율 무시)</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
                       <div className="relative border-2 border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden w-full max-w-full" style={{ maxWidth: 'min(100%, 300px)' }}>
-                        <canvas
-                          ref={canvasRef}
+                        <div
+                          ref={pixiContainerRef}
                           className="w-full h-auto bg-black"
-                          style={{ aspectRatio: '9/16' }}
+                          style={{ aspectRatio }}
                         />
                       </div>
                       {/* 재생 바 */}
@@ -980,6 +1066,8 @@ export default function Step4Page() {
                           const isActive = currentSceneIndex === index
                           const sceneTransition =
                             timeline?.scenes[index]?.transition ?? 'fade'
+                          const sceneImageFit =
+                            timeline?.scenes[index]?.imageFit ?? 'cover'
                           return (
                             <div
                               key={scene.sceneId ?? index}
@@ -1070,7 +1158,63 @@ export default function Step4Page() {
                                       <option value="circle">Circle</option>
                                       <option value="crossfade">Crossfade</option>
                                     </select>
+                                    {index > 0 && (
+                                      <div className="flex items-center gap-0.5">
+                                        <span className={`text-[10px] ${
+                                          theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                                        }`}>
+                                          전환:
+                                        </span>
+                                        <input
+                                          type="number"
+                                          min="0.1"
+                                          max="2"
+                                          step="0.1"
+                                          value={timeline?.scenes[index]?.transitionDuration?.toFixed(1) || '0.5'}
+                                          onChange={(e) => {
+                                            const value = parseFloat(e.target.value)
+                                            if (!isNaN(value)) {
+                                              handleSceneTransitionDurationChange(index, value)
+                                            }
+                                          }}
+                                          className={`w-8 text-[10px] rounded-md border px-0.5 py-0.5 text-right ${
+                                            theme === 'dark'
+                                              ? 'bg-gray-800 border-gray-700 text-white'
+                                              : 'bg-white border-gray-300 text-gray-900'
+                                          } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <span className={`text-[10px] ${
+                                          theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                                        }`}>
+                                          초
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] ${
+                                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                                  }`}>
+                                    이미지:
+                                  </span>
+                                  <select
+                                    value={sceneImageFit}
+                                    onChange={(e) =>
+                                      handleSceneImageFitChange(index, e.target.value as 'cover' | 'contain' | 'fill')
+                                    }
+                                    className={`text-[10px] rounded-md border px-1.5 py-0.5 bg-transparent ${
+                                      theme === 'dark'
+                                        ? 'border-gray-700 text-gray-200'
+                                        : 'border-gray-300 text-gray-700'
+                                    } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <option value="cover">Cover</option>
+                                    <option value="contain">Contain</option>
+                                    <option value="fill">Fill</option>
+                                  </select>
                                 </div>
                                 <textarea
                                   rows={2}
@@ -1157,4 +1301,6 @@ export default function Step4Page() {
     </motion.div>
   )
 }
+
+
 

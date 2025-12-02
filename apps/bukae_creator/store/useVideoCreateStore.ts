@@ -54,7 +54,9 @@ export interface TimelineScene {
   sceneId: number
   duration: number
   transition: string
+  transitionDuration?: number // 전환 시간 (초), 기본값 0.5
   image: string // base64 또는 URL
+  imageFit?: 'cover' | 'contain' | 'fill' // 이미지 표시 방식
   text: {
     content: string
     font: string
