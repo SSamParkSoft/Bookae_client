@@ -8,9 +8,10 @@ import { useThemeStore } from '../store/useThemeStore'
 
 const steps = [
   { number: 1, label: '상품 선택', path: '/video/create/step1' },
-  { number: 2, label: '영상 제작', path: '/video/create/step2' },
-  { number: 3, label: '영상 편집', path: '/video/create/step3' },
-  { number: 4, label: '업로드', path: '/video/create/step4' },
+  { number: 2, label: '제작 방식 & 대본 스타일', path: '/video/create/step2' },
+  { number: 3, label: '이미지 및 대본', path: '/video/create/step3' },
+  { number: 4, label: '미리보기 및 효과', path: '/video/create/step4' },
+  { number: 5, label: '영상 제목 선택', path: '/video/create/step6' },
 ]
 
 export default function StepIndicator() {
@@ -19,6 +20,7 @@ export default function StepIndicator() {
   const theme = useThemeStore((state) => state.theme)
 
   const getCurrentStep = () => {
+    if (pathname.includes('/step6')) return 5
     if (pathname.includes('/step4')) return 4
     if (pathname.includes('/step3')) return 3
     if (pathname.includes('/step2')) return 2
@@ -32,7 +34,7 @@ export default function StepIndicator() {
   }
 
   return (
-    <div className={`sticky top-0 w-40 md:w-48 h-screen flex flex-col py-4 md:py-6 transition-colors z-10 flex-shrink-0 ${
+    <div className={`sticky top-0 w-52 md:w-64 h-screen flex flex-col py-4 md:py-6 transition-colors z-10 flex-shrink-0 ${
       theme === 'dark'
         ? 'bg-gray-900 border-gray-800'
         : 'bg-white border-gray-200'
@@ -60,7 +62,7 @@ export default function StepIndicator() {
                 <div className="flex items-center gap-4 w-full">
                   <div
                     className={cn(
-                      'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all',
+                      'flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all shrink-0',
                       isActive
                         ? theme === 'dark'
                           ? 'bg-purple-600 text-white'

@@ -354,7 +354,7 @@ export default function Step1Page() {
 
   const handleNext = () => {
     if (selectedProducts.length > 0) {
-      router.push('/video/create/script-method')
+      router.push('/video/create/step2')
     }
   }
 
@@ -568,6 +568,19 @@ export default function Step1Page() {
               </div>
             )}
           </div>
+
+          {/* 다음 단계 버튼 */}
+          {selectedProducts.length > 0 && (
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleNext}
+                className="inline-flex items-center gap-2 rounded-lg bg-purple-500 px-4 py-2 text-sm font-medium text-white hover:bg-purple-600 transition-colors"
+              >
+                다음 단계
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
 
           </div>
         </div>
