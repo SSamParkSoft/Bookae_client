@@ -850,41 +850,56 @@ export default function Step4Page() {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.3 }}
-      className="flex min-h-screen justify-center"
+      className="flex min-h-screen"
     >
-      <div className="flex w-full max-w-[1600px]">
-        <StepIndicator />
-        <div className="flex-1 p-4 md:p-8 overflow-y-auto min-w-0">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div>
-              <h1 className={`text-3xl font-bold mb-2 ${
-                theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}>
-                미리보기 및 효과 선택
-              </h1>
-              <p className={`mt-2 ${
-                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                왼쪽 미리보기에서 전체 흐름을 확인하고, 오른쪽에서 각 Scene의 자막과 효과를 편집하세요.
-              </p>
+      <StepIndicator />
+      <div className="flex-1 flex overflow-hidden">
+        {/* 메인 컨텐츠 영역 */}
+        <div className="flex-1 p-4 md:p-6 overflow-y-auto min-w-0">
+          <div className="max-w-full h-full flex flex-col">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}>
+                  미리보기 및 효과 선택
+                </h1>
+                <p className={`text-sm md:text-base ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  미리보기에서 전체 흐름을 확인하고, 각 Scene의 자막과 효과를 편집하세요.
+                </p>
+              </div>
+              {/* 다음 단계 버튼 */}
+              <div className="shrink-0">
+                <Button
+                  onClick={handleNext}
+                  size="lg"
+                  className="gap-2"
+                >
+                  다음 단계
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6">
-              {/* 좌측: Canvas 미리보기 + 효과 */}
-              <div className="space-y-4">
-                {/* Canvas 미리보기 */}
-                <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-                  <CardHeader>
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 md:gap-6 min-h-0">
+              {/* 좌측: Canvas 미리보기 */}
+              <div className="flex flex-col space-y-4 min-h-0">
+                <Card className={`flex-1 flex flex-col min-h-0 ${
+                  theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
+                  <CardHeader className="shrink-0">
                     <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                      실시간 미리보기
+                      Preview
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
                     <div className="flex flex-col gap-4">
-                      <div className="relative border-2 border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden self-center">
+                      <div className="relative border-2 border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden self-center w-full max-w-[240px]">
                         <canvas
                           ref={canvasRef}
-                          className="w-full max-w-[540px] h-auto bg-black"
+                          className="w-full h-auto bg-black"
                           style={{ aspectRatio: '9/16' }}
                         />
                       </div>
@@ -907,11 +922,12 @@ export default function Step4Page() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           onClick={handlePlayPause}
                           variant="outline"
                           size="sm"
+                          className="flex-1 min-w-[100px]"
                         >
                           {isPlaying ? (
                             <>
@@ -928,6 +944,7 @@ export default function Step4Page() {
                         <Button
                           onClick={handleGenerateVideo}
                           size="sm"
+                          className="flex-1 min-w-[100px]"
                         >
                           최종 영상 만들기
                         </Button>
@@ -935,121 +952,29 @@ export default function Step4Page() {
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* 효과 선택 */}
-                <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-                  <CardHeader>
-                    <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                      효과 선택
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* 자막 선택 */}
-                      <SubtitleSelectionDialog>
-                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                        }`}>
-                          <CardHeader>
-                            <CardTitle className={`flex items-center gap-2 text-base ${
-                              theme === 'dark' ? 'text-white' : 'text-gray-900'
-                            }`}>
-                              <Type className={`w-5 h-5 ${
-                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                              }`} />
-                              자막 선택
-                            </CardTitle>
-                          </CardHeader>
-                        </Card>
-                      </SubtitleSelectionDialog>
-
-                      {/* 배경음악 선택 */}
-                      <BgmSelectionDialog>
-                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                        }`}>
-                          <CardHeader>
-                            <CardTitle className={`flex items-center gap-2 text-base ${
-                              theme === 'dark' ? 'text-white' : 'text-gray-900'
-                            }`}>
-                              <Music className={`w-5 h-5 ${
-                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                              }`} />
-                              배경음악 선택
-                            </CardTitle>
-                          </CardHeader>
-                        </Card>
-                      </BgmSelectionDialog>
-
-                      {/* 전환 효과 */}
-                      <TransitionEffectDialog>
-                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                        }`}>
-                          <CardHeader>
-                            <CardTitle className={`flex items-center gap-2 text-base ${
-                              theme === 'dark' ? 'text-white' : 'text-gray-900'
-                            }`}>
-                              <Shuffle className={`w-5 h-5 ${
-                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                              }`} />
-                              전환 효과
-                            </CardTitle>
-                          </CardHeader>
-                        </Card>
-                      </TransitionEffectDialog>
-
-                      {/* 목소리 선택 */}
-                      <VoiceSelectionDialog>
-                        <Card className={`cursor-pointer hover:border-purple-500 transition-colors ${
-                          theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
-                        }`}>
-                          <CardHeader>
-                            <CardTitle className={`flex items-center gap-2 text-base ${
-                              theme === 'dark' ? 'text-white' : 'text-gray-900'
-                            }`}>
-                              <Settings className={`w-5 h-5 ${
-                                theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
-                              }`} />
-                              목소리 선택
-                            </CardTitle>
-                          </CardHeader>
-                        </Card>
-                      </VoiceSelectionDialog>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* 다음 단계 버튼 */}
-                <div className="flex justify-end pt-2">
-                  <Button
-                    onClick={handleNext}
-                    size="lg"
-                    className="gap-2"
-                  >
-                    다음 단계
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
-                </div>
               </div>
 
               {/* 우측: Scene 리스트 */}
-              <div className="space-y-3">
-                <Card className={theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}>
-                  <CardHeader>
-                    <CardTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+              <div className="flex flex-col min-h-0">
+                <Card className={`flex flex-col h-[633px] ${
+                  theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
+                  <CardHeader className="shrink-0 pb-3">
+                    <CardTitle className={`text-base ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}>
                       Scene 리스트
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="flex-1 overflow-y-auto min-h-0">
                     {scenes.length === 0 ? (
-                      <p className={`text-sm ${
+                      <p className={`text-xs ${
                         theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
                       }`}>
                         Step3에서 이미지와 스크립트를 먼저 생성해주세요.
                       </p>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {scenes.map((scene, index) => {
                           const thumb = sceneThumbnails[index]
                           const isActive = currentSceneIndex === index
@@ -1058,7 +983,7 @@ export default function Step4Page() {
                           return (
                             <div
                               key={scene.sceneId ?? index}
-                              className={`flex gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                              className={`flex gap-2 rounded-lg border p-2 cursor-pointer transition-colors ${
                                 isActive
                                   ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
                                   : theme === 'dark'
@@ -1067,7 +992,7 @@ export default function Step4Page() {
                               }`}
                               onClick={() => handleSceneSelect(index)}
                             >
-                              <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0">
+                              <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0">
                                 {thumb ? (
                                   <img
                                     src={thumb}
@@ -1076,16 +1001,16 @@ export default function Step4Page() {
                                   />
                                 ) : null}
                               </div>
-                              <div className="flex-1 space-y-2">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className={`text-xs font-semibold uppercase ${
+                              <div className="flex-1 space-y-1.5 min-w-0">
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <span className={`text-[10px] font-semibold uppercase ${
                                     theme === 'dark' ? 'text-purple-300' : 'text-purple-700'
                                   }`}>
                                     Scene {index + 1}
                                   </span>
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1">
-                                      <span className={`text-xs ${
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <div className="flex items-center gap-0.5">
+                                      <span className={`text-[10px] ${
                                         theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
                                       }`}>
                                         시간:
@@ -1102,14 +1027,14 @@ export default function Step4Page() {
                                             handleSceneDurationChange(index, value)
                                           }
                                         }}
-                                        className={`w-12 text-xs rounded-md border px-1 py-0.5 text-right ${
+                                        className={`w-10 text-[10px] rounded-md border px-0.5 py-0.5 text-right ${
                                           theme === 'dark'
                                             ? 'bg-gray-800 border-gray-700 text-white'
                                             : 'bg-white border-gray-300 text-gray-900'
                                         } focus:outline-none focus:ring-1 focus:ring-purple-500`}
                                         onClick={(e) => e.stopPropagation()}
                                       />
-                                      <span className={`text-xs ${
+                                      <span className={`text-[10px] ${
                                         theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
                                       }`}>
                                         초
@@ -1120,7 +1045,7 @@ export default function Step4Page() {
                                       onChange={(e) =>
                                         handleSceneTransitionChange(index, e.target.value)
                                       }
-                                      className={`text-xs rounded-md border px-2 py-1 bg-transparent ${
+                                      className={`text-[10px] rounded-md border px-1.5 py-0.5 bg-transparent ${
                                         theme === 'dark'
                                           ? 'border-gray-700 text-gray-200'
                                           : 'border-gray-300 text-gray-700'
@@ -1148,12 +1073,12 @@ export default function Step4Page() {
                                   </div>
                                 </div>
                                 <textarea
-                                  rows={3}
+                                  rows={2}
                                   value={scene.script}
                                   onChange={(e) =>
                                     handleSceneScriptChange(index, e.target.value)
                                   }
-                                  className={`w-full text-sm rounded-md border px-2 py-1 resize-none ${
+                                  className={`w-full text-xs rounded-md border px-1.5 py-1 resize-none ${
                                     theme === 'dark'
                                       ? 'bg-gray-800 border-gray-700 text-white'
                                       : 'bg-white border-gray-300 text-gray-900'
@@ -1170,6 +1095,63 @@ export default function Step4Page() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* 오른쪽 사이드바: 효과 선택 (아이콘만) - sticky */}
+        <div className={`w-16 md:w-20 border-l flex flex-col items-center py-4 gap-3 sticky top-0 self-start ${
+          theme === 'dark' ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'
+        }`}>
+          <SubtitleSelectionDialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`w-12 h-12 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors ${
+                theme === 'dark' ? 'text-gray-300 hover:text-purple-400' : 'text-gray-600 hover:text-purple-600'
+              }`}
+              title="자막 선택"
+            >
+              <Type className="w-6 h-6" />
+            </Button>
+          </SubtitleSelectionDialog>
+
+          <BgmSelectionDialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`w-12 h-12 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors ${
+                theme === 'dark' ? 'text-gray-300 hover:text-purple-400' : 'text-gray-600 hover:text-purple-600'
+              }`}
+              title="배경음악 선택"
+            >
+              <Music className="w-6 h-6" />
+            </Button>
+          </BgmSelectionDialog>
+
+          <TransitionEffectDialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`w-12 h-12 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors ${
+                theme === 'dark' ? 'text-gray-300 hover:text-purple-400' : 'text-gray-600 hover:text-purple-600'
+              }`}
+              title="전환 효과"
+            >
+              <Shuffle className="w-6 h-6" />
+            </Button>
+          </TransitionEffectDialog>
+
+          <VoiceSelectionDialog>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`w-12 h-12 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors ${
+                theme === 'dark' ? 'text-gray-300 hover:text-purple-400' : 'text-gray-600 hover:text-purple-600'
+              }`}
+              title="목소리 선택"
+            >
+              <Settings className="w-6 h-6" />
+            </Button>
+          </VoiceSelectionDialog>
         </div>
       </div>
     </motion.div>
