@@ -56,22 +56,38 @@ export default function Step3Page() {
     // 중복 제거
     const uniqueImages = Array.from(new Set(images))
 
-    // 서버/DB에서 이미지가 하나도 안 올 때 사용할 더미 이미지들 (최소 5장 이상)
+    // 더미 이미지 목록 (public/media 폴더의 이미지들)
+    const dummyImages = [
+      '/media/spael-massager.png',
+      '/media/air-filter-set.png',
+      '/media/bluetooth-speaker.png',
+      '/media/led-strip-light.png',
+      '/media/num1.png',
+      '/media/num2.png',
+      '/media/num3.png',
+      '/media/num4.png',
+      '/media/num5.png',
+      '/media/num6.png',
+    ]
+
+    // 상품 이미지가 없을 때: 더미 이미지만 반환
     if (uniqueImages.length === 0) {
-      return [
-        '/media/spael-massager.png',
-        '/media/air-filter-set.png',
-        '/media/bluetooth-speaker.png',
-        '/media/led-strip-light.png',
-        '/media/num1.png',
-        '/media/num2.png',
-        '/media/num3.png',
-        '/media/num4.png',
-        '/media/num5.png',
-        '/media/num6.png',
-      ]
+      return dummyImages
     }
 
+    // 상품 이미지가 1개 이상이지만 5개 미만일 때: 상품 이미지 + 더미 이미지 추가
+    if (uniqueImages.length > 0 && uniqueImages.length < 5) {
+      // 상품 이미지와 중복되지 않는 더미 이미지만 추가
+      const additionalDummyImages = dummyImages.filter(
+        (dummy) => !uniqueImages.includes(dummy)
+      )
+      // 최소 5장 이상이 되도록 더미 이미지 추가
+      const neededCount = 5 - uniqueImages.length
+      const imagesToAdd = additionalDummyImages.slice(0, neededCount)
+      return [...uniqueImages, ...imagesToAdd]
+    }
+
+    // 상품 이미지가 5개 이상일 때: 상품 이미지만 반환
     return uniqueImages
   }, [productData, allImages, selectedProduct])
 
