@@ -855,9 +855,9 @@ export default function Step4Page() {
       <StepIndicator />
       <div className="flex-1 flex overflow-hidden">
         {/* 메인 컨텐츠 영역 */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto min-w-0">
-          <div className="max-w-full h-full flex flex-col">
-            <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex-1 p-4 md:p-6 overflow-hidden min-w-0">
+          <div className="h-full flex flex-col">
+            <div className="shrink-0 mb-4 flex items-start justify-between gap-4">
               <div className="flex-1">
                 <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${
                   theme === 'dark' ? 'text-white' : 'text-gray-900'
@@ -883,10 +883,10 @@ export default function Step4Page() {
               </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 md:gap-6 min-h-0">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 md:gap-6 min-h-0 overflow-hidden">
               {/* 좌측: Canvas 미리보기 */}
               <div className="flex flex-col space-y-4 min-h-0">
-                <Card className={`flex-1 flex flex-col min-h-0 ${
+                <Card className={`flex-1 flex flex-col min-h-0 max-h-[800px] ${
                   theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
                 }`}>
                   <CardHeader className="shrink-0">
@@ -895,8 +895,8 @@ export default function Step4Page() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                    <div className="flex flex-col gap-4">
-                      <div className="relative border-2 border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden self-center w-full max-w-[240px]">
+                    <div className="flex-1 flex flex-col gap-3 md:gap-4 justify-center items-center">
+                      <div className="relative border-2 border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden w-full max-w-full" style={{ maxWidth: 'min(100%, 300px)' }}>
                         <canvas
                           ref={canvasRef}
                           className="w-full h-auto bg-black"
@@ -904,13 +904,13 @@ export default function Step4Page() {
                         />
                       </div>
                       {/* 재생 바 */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <div className="w-full space-y-1.5 md:space-y-2 px-2">
+                        <div className="flex items-center justify-between text-[10px] md:text-xs text-gray-500 dark:text-gray-400">
                           <span>Scene {currentSceneIndex + 1} / {scenes.length || 0}</span>
                         </div>
                         <div
                           ref={timelineBarRef}
-                          className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden cursor-pointer relative"
+                          className="w-full h-1.5 md:h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden cursor-pointer relative"
                           onMouseDown={handleTimelineMouseDown}
                         >
                           <div
@@ -922,21 +922,21 @@ export default function Step4Page() {
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="w-full flex flex-col sm:flex-row gap-2 px-2">
                         <Button
                           onClick={handlePlayPause}
                           variant="outline"
                           size="sm"
-                          className="flex-1 min-w-[100px]"
+                          className="w-full sm:flex-1 text-xs md:text-sm"
                         >
                           {isPlaying ? (
                             <>
-                              <Pause className="w-4 h-4 mr-2" />
+                              <Pause className="w-3 h-3 md:w-4 md:h-4 mr-1.5 md:mr-2" />
                               일시정지
                             </>
                           ) : (
                             <>
-                              <Play className="w-4 h-4 mr-2" />
+                              <Play className="w-3 h-3 md:w-4 md:h-4 mr-1.5 md:mr-2" />
                               재생
                             </>
                           )}
@@ -944,7 +944,7 @@ export default function Step4Page() {
                         <Button
                           onClick={handleGenerateVideo}
                           size="sm"
-                          className="flex-1 min-w-[100px]"
+                          className="w-full sm:flex-1 text-xs md:text-sm"
                         >
                           최종 영상 만들기
                         </Button>
@@ -956,7 +956,7 @@ export default function Step4Page() {
 
               {/* 우측: Scene 리스트 */}
               <div className="flex flex-col min-h-0">
-                <Card className={`flex flex-col h-[633px] ${
+                <Card className={`flex flex-col h-full max-h-[800px] ${
                   theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
                 }`}>
                   <CardHeader className="shrink-0 pb-3">
