@@ -3,12 +3,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Play, Pause, Volume2, Image as ImageIcon, Clock, Edit2, GripVertical } from 'lucide-react'
+import { Play, Pause, Volume2, Image as ImageIcon, Clock, Edit2, GripVertical, Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import StepIndicator from '@/components/StepIndicator'
-import { useVideoCreateStore, TimelineData } from '@/store/useVideoCreateStore'
+import { useVideoCreateStore, TimelineData, TimelineScene } from '@/store/useVideoCreateStore'
 import { useThemeStore } from '@/store/useThemeStore'
 import * as PIXI from 'pixi.js'
 import { gsap } from 'gsap'
@@ -48,6 +48,16 @@ export default function Step4Page() {
   const dragStartPosRef = useRef({ x: 0, y: 0 })
   const particlesRef = useRef<Map<number, PIXI.Container>>(new Map()) // 씬별 파티클 컨테이너
   const particleAnimationsRef = useRef<Map<number, gsap.core.Timeline>>(new Map()) // 파티클 애니메이션
+  const editHandlesRef = useRef<Map<number, PIXI.Container>>(new Map()) // 편집 핸들 컨테이너 (씬별)
+  const isResizingRef = useRef(false)
+  const resizeHandleRef = useRef<'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null)
+  const originalTransformRef = useRef<{ x: number; y: number; width: number; height: number; scaleX: number; scaleY: number; rotation: number } | null>(null)
+  const originalSpriteTransformRef = useRef<Map<number, { x: number; y: number; width: number; height: number; scaleX: number; scaleY: number; rotation: number }>>(new Map()) // 편집 시작 시 원래 Transform 저장
+  const originalTextTransformRef = useRef<Map<number, { x: number; y: number; width: number; height: number; scaleX: number; scaleY: number; rotation: number }>>(new Map()) // 텍스트 편집 시작 시 원래 Transform 저장
+  const isSavingTransformRef = useRef(false) // Transform 저장 중 플래그 (loadAllScenes 재호출 방지)
+  const savedSceneIndexRef = useRef<number | null>(null) // 편집 종료 시 씬 인덱스 저장
+  const textEditHandlesRef = useRef<Map<number, PIXI.Container>>(new Map()) // 텍스트 편집 핸들 컨테이너 (씬별)
+  const isResizingTextRef = useRef(false) // 텍스트 리사이즈 중 플래그
   
   // State
   const [isPlaying, setIsPlaying] = useState(false)
@@ -236,8 +246,8 @@ export default function Step4Page() {
         y: (stageHeight - height) / 2,
         width,
         height,
-      }
-    } else {
+          }
+        } else {
       const scale = imgAspect > stageAspect 
         ? stageWidth / textureWidth 
         : stageHeight / textureHeight
@@ -898,8 +908,8 @@ export default function Step4Page() {
     console.log('Step4: updateCurrentScene called, index:', currentSceneIndex, 'skipAnimation:', skipAnimation, 'container:', !!containerRef.current, 'timeline:', !!timeline)
     if (!containerRef.current || !timeline || !appRef.current) {
       console.log('Step4: updateCurrentScene skipped - missing container or timeline')
-      return
-    }
+        return
+      }
 
     const spriteCount = spritesRef.current.size
     const textCount = textsRef.current.size
@@ -939,8 +949,8 @@ export default function Step4Page() {
         appRef.current.render()
       }
       previousSceneIndexRef.current = currentSceneIndex
-      return
-    }
+        return
+      }
 
     // 현재 씬 등장 효과 적용
     if (currentSprite) {
@@ -997,8 +1007,8 @@ export default function Step4Page() {
   const loadAllScenes = useCallback(async () => {
     if (!appRef.current || !containerRef.current || !timeline) {
       console.log('Step4: loadAllScenes skipped - app:', !!appRef.current, 'container:', !!containerRef.current, 'timeline:', !!timeline)
-      return
-    }
+        return
+      }
 
     console.log('Step4: loadAllScenes started, scenes count:', timeline.scenes.length)
 
@@ -1038,16 +1048,28 @@ export default function Step4Page() {
         sprite.visible = false
         sprite.alpha = 0
 
+        // Transform 데이터 적용
+        if (scene.imageTransform) {
+          sprite.x = scene.imageTransform.x
+          sprite.y = scene.imageTransform.y
+          sprite.width = scene.imageTransform.width
+          sprite.height = scene.imageTransform.height
+          sprite.scale.set(scene.imageTransform.scaleX, scene.imageTransform.scaleY)
+          sprite.rotation = scene.imageTransform.rotation
+        }
+
         container.addChild(sprite)
         spritesRef.current.set(sceneIndex, sprite)
         console.log(`Step4: Sprite added for scene ${sceneIndex}`)
 
-        if (scene.text?.content) {
+          if (scene.text?.content) {
           const textStyle = new PIXI.TextStyle({
             fontFamily: scene.text.font || 'Arial',
             fontSize: scene.text.fontSize || 32,
             fill: scene.text.color || '#ffffff',
-            align: 'center',
+            align: scene.text.style?.align || 'center',
+            fontWeight: scene.text.style?.bold ? 'bold' : 'normal',
+            fontStyle: scene.text.style?.italic ? 'italic' : 'normal',
             dropShadow: {
               color: '#000000',
               blur: 10,
@@ -1063,9 +1085,9 @@ export default function Step4Page() {
 
           text.anchor.set(0.5, 0.5)
           let textY = height / 2
-          if (scene.text.position === 'top') {
-            textY = 200
-          } else if (scene.text.position === 'bottom') {
+            if (scene.text.position === 'top') {
+              textY = 200
+            } else if (scene.text.position === 'bottom') {
             textY = height - 200
           }
           text.x = width / 2
@@ -1073,10 +1095,18 @@ export default function Step4Page() {
           text.visible = false
           text.alpha = 0
 
+          // 텍스트 Transform 적용
+          if (scene.text.transform) {
+            text.x = scene.text.transform.x
+            text.y = scene.text.transform.y
+            text.scale.set(scene.text.transform.width / (text.width || 1), scene.text.transform.height / (text.height || 1))
+            text.rotation = scene.text.transform.rotation
+          }
+
           container.addChild(text)
           textsRef.current.set(sceneIndex, text)
-        }
-      } catch (error) {
+          }
+        } catch (error) {
         console.error(`Failed to load scene ${sceneIndex}:`, error)
       }
     }
@@ -1093,7 +1123,10 @@ export default function Step4Page() {
     // 렌더링 강제 실행
     requestAnimationFrame(() => {
       console.log('Step4: Updating current scene after load, index:', currentSceneIndex)
-      updateCurrentScene()
+      // Transform 저장 중이 아닐 때만 updateCurrentScene 호출
+      if (!isSavingTransformRef.current) {
+        updateCurrentScene()
+      }
       if (appRef.current) {
         console.log('Step4: Rendering PixiJS app')
         appRef.current.render()
@@ -1105,9 +1138,14 @@ export default function Step4Page() {
 
   // Pixi와 타임라인이 모두 준비되면 씬 로드
   useEffect(() => {
-    console.log('Step4: loadAllScenes effect - pixiReady:', pixiReady, 'app:', !!appRef.current, 'container:', !!containerRef.current, 'timeline:', !!timeline, 'scenes:', timeline?.scenes.length)
+    console.log('Step4: loadAllScenes effect - pixiReady:', pixiReady, 'app:', !!appRef.current, 'container:', !!containerRef.current, 'timeline:', !!timeline, 'scenes:', timeline?.scenes.length, 'isSavingTransform:', isSavingTransformRef.current)
     if (!pixiReady || !appRef.current || !containerRef.current || !timeline || timeline.scenes.length === 0) {
       console.log('Step4: loadAllScenes effect skipped - waiting for refs')
+      return
+    }
+    // Transform 저장 중일 때는 loadAllScenes를 호출하지 않음 (편집 종료 시 원래 Transform으로 되돌아가는 것 방지)
+    if (isSavingTransformRef.current) {
+      console.log('Step4: loadAllScenes effect skipped - saving transform')
       return
     }
     console.log('Step4: Calling loadAllScenes')
@@ -1116,6 +1154,8 @@ export default function Step4Page() {
       loadAllScenes()
     })
   }, [pixiReady, timeline, loadAllScenes])
+  
+  // timeline 변경 시 저장된 씬 인덱스 복원 (더 이상 필요 없음 - 편집 종료 버튼에서 직접 처리)
 
   useEffect(() => {
     updateCurrentScene()
@@ -1382,6 +1422,856 @@ export default function Step4Page() {
     }
   }
 
+  // 편집 핸들 그리기
+  const drawEditHandles = useCallback((sprite: PIXI.Sprite, sceneIndex: number, handleResize: (e: PIXI.FederatedPointerEvent, sceneIndex: number) => void, saveImageTransform: (sceneIndex: number, sprite: PIXI.Sprite) => void) => {
+    if (!containerRef.current || !sprite) return
+
+    // 기존 핸들 제거
+    const existingHandles = editHandlesRef.current.get(sceneIndex)
+    if (existingHandles && existingHandles.parent) {
+      existingHandles.parent.removeChild(existingHandles)
+    }
+
+    const handlesContainer = new PIXI.Container()
+    handlesContainer.interactive = true
+
+    // 스프라이트의 경계 박스 계산
+    const bounds = sprite.getBounds()
+    const handleSize = 20 // 핸들 크기 증가
+    const handleColor = 0x8b5cf6 // 보라색
+    const handleBorderColor = 0xffffff // 흰색 테두리
+
+    // 8방향 핸들 위치
+    const handles: Array<{ x: number; y: number; type: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' }> = [
+      { x: bounds.x, y: bounds.y, type: 'nw' }, // 좌상
+      { x: bounds.x + bounds.width / 2, y: bounds.y, type: 'n' }, // 상
+      { x: bounds.x + bounds.width, y: bounds.y, type: 'ne' }, // 우상
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2, type: 'e' }, // 우
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height, type: 'se' }, // 우하
+      { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height, type: 's' }, // 하
+      { x: bounds.x, y: bounds.y + bounds.height, type: 'sw' }, // 좌하
+      { x: bounds.x, y: bounds.y + bounds.height / 2, type: 'w' }, // 좌
+    ]
+
+    handles.forEach((handle) => {
+      const handleGraphics = new PIXI.Graphics()
+      handleGraphics.beginFill(handleColor, 1)
+      handleGraphics.lineStyle(2, handleBorderColor, 1)
+      handleGraphics.drawRect(-handleSize / 2, -handleSize / 2, handleSize, handleSize)
+      handleGraphics.endFill()
+      handleGraphics.x = handle.x
+      handleGraphics.y = handle.y
+      handleGraphics.interactive = true
+      handleGraphics.cursor = 'pointer'
+      handleGraphics.name = handle.type
+
+      // 드래그 시작
+      handleGraphics.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+        e.stopPropagation()
+        isResizingRef.current = true
+        resizeHandleRef.current = handle.type
+        const sprite = spritesRef.current.get(sceneIndex)
+        if (sprite) {
+          // 원래 Transform을 timeline에서 가져오거나 저장된 값 사용
+          let originalTransform
+          if (originalSpriteTransformRef.current.has(sceneIndex)) {
+            originalTransform = originalSpriteTransformRef.current.get(sceneIndex)!
+          } else {
+            const scene = timeline?.scenes[sceneIndex]
+            if (scene?.imageTransform) {
+              originalTransform = scene.imageTransform
+            } else {
+              // timeline에 Transform이 없으면 현재 스프라이트의 초기 위치 사용
+              originalTransform = {
+                x: sprite.x,
+                y: sprite.y,
+                width: sprite.width,
+                height: sprite.height,
+                scaleX: sprite.scale.x,
+                scaleY: sprite.scale.y,
+                rotation: sprite.rotation,
+              }
+            }
+            originalSpriteTransformRef.current.set(sceneIndex, originalTransform)
+          }
+          
+          // 리사이즈 시작 시 현재 스프라이트의 실제 bounds를 기준으로 설정
+          // getBounds()를 사용하여 스케일과 앵커를 고려한 실제 위치와 크기를 가져옴
+          const bounds = sprite.getBounds()
+          originalTransformRef.current = {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+            scaleX: sprite.scale.x,
+            scaleY: sprite.scale.y,
+            rotation: sprite.rotation,
+          }
+        }
+        setSelectedElementIndex(sceneIndex)
+        setSelectedElementType('image')
+      })
+
+      // 리사이즈 중 (전역 이벤트로 처리)
+      const handleGlobalMove = (e: MouseEvent) => {
+        if (isResizingRef.current && resizeHandleRef.current === handle.type && appRef.current) {
+          // MouseEvent를 PixiJS 스테이지 좌표로 변환
+          const canvas = appRef.current.canvas
+          const rect = canvas.getBoundingClientRect()
+          const scaleX = canvas.width / rect.width
+          const scaleY = canvas.height / rect.height
+          const globalPos = {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY,
+          }
+          
+          // PixiJS 이벤트처럼 변환
+          const pixiEvent = {
+            global: globalPos,
+          } as PIXI.FederatedPointerEvent
+          handleResize(pixiEvent, sceneIndex)
+        }
+      }
+
+      const handleGlobalUp = () => {
+        if (isResizingRef.current && resizeHandleRef.current === handle.type) {
+          isResizingRef.current = false
+          resizeHandleRef.current = null
+          // 리사이즈 종료 시 Transform 저장하지 않음 (편집 종료 시 저장)
+          document.removeEventListener('mousemove', handleGlobalMove)
+          document.removeEventListener('mouseup', handleGlobalUp)
+        }
+      }
+
+      handleGraphics.on('pointerdown', () => {
+        document.addEventListener('mousemove', handleGlobalMove)
+        document.addEventListener('mouseup', handleGlobalUp)
+      })
+
+      handlesContainer.addChild(handleGraphics)
+    })
+
+    // 경계선 그리기
+    const borderGraphics = new PIXI.Graphics()
+    borderGraphics.lineStyle(2, handleColor, 1)
+    borderGraphics.drawRect(bounds.x, bounds.y, bounds.width, bounds.height)
+    handlesContainer.addChild(borderGraphics)
+
+    containerRef.current.addChild(handlesContainer)
+    editHandlesRef.current.set(sceneIndex, handlesContainer)
+  }, []) // handleResize와 saveImageTransform은 파라미터로 받으므로 의존성 배열에 포함하지 않음
+
+  // Transform 데이터 저장 (단일 씬)
+  const saveImageTransform = useCallback((sceneIndex: number, sprite: PIXI.Sprite) => {
+    if (!timeline || !sprite) return
+
+    const transform = {
+      x: sprite.x,
+      y: sprite.y,
+      width: sprite.width,
+      height: sprite.height,
+      scaleX: sprite.scale.x,
+      scaleY: sprite.scale.y,
+      rotation: sprite.rotation,
+    }
+
+    const nextTimeline: TimelineData = {
+      ...timeline,
+      scenes: timeline.scenes.map((scene, i) => {
+        if (i === sceneIndex) {
+          return {
+            ...scene,
+            imageTransform: transform,
+          }
+        }
+        return scene
+      }),
+    }
+    setTimeline(nextTimeline)
+  }, [timeline, setTimeline])
+  
+  // 모든 Transform 데이터 일괄 저장
+  const saveAllImageTransforms = useCallback((transforms: Map<number, { x: number; y: number; width: number; height: number; scaleX: number; scaleY: number; rotation: number }>) => {
+    if (!timeline || transforms.size === 0) return
+
+    // Transform 저장 중 플래그 설정 (loadAllScenes 재호출 방지)
+    isSavingTransformRef.current = true
+
+    const nextTimeline: TimelineData = {
+      ...timeline,
+      scenes: timeline.scenes.map((scene, i) => {
+        if (transforms.has(i)) {
+          const transform = transforms.get(i)!
+          return {
+            ...scene,
+            imageTransform: transform,
+          }
+        }
+        return scene
+      }),
+    }
+    setTimeline(nextTimeline)
+    
+    // 모든 저장이 완료된 후 플래그 해제 (약간의 지연을 두어 timeline 업데이트가 완료되도록)
+    setTimeout(() => {
+      isSavingTransformRef.current = false
+    }, 100)
+  }, [timeline, setTimeline])
+
+  // 리사이즈 핸들러
+  const handleResize = useCallback((e: PIXI.FederatedPointerEvent | MouseEvent, sceneIndex: number) => {
+    if (!isResizingRef.current || !resizeHandleRef.current || !originalTransformRef.current) return
+
+    const sprite = spritesRef.current.get(sceneIndex)
+    if (!sprite || !appRef.current) return
+
+    // 마우스 좌표를 PixiJS 좌표로 변환
+    let globalPos: { x: number; y: number }
+    if (e instanceof MouseEvent) {
+      // MouseEvent인 경우
+      const canvas = appRef.current.canvas
+      const rect = canvas.getBoundingClientRect()
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      globalPos = {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      }
+    } else {
+      // PIXI.FederatedPointerEvent인 경우
+      const pixiEvent = e as PIXI.FederatedPointerEvent
+      globalPos = pixiEvent.global
+    }
+
+    const handleType = resizeHandleRef.current
+    const original = originalTransformRef.current
+
+    // 각 핸들 타입에 따라 크기와 위치 계산
+    // 반대편 모서리/변을 기준으로 계산하여 예측 가능한 리사이즈 구현
+    let newWidth = original.width
+    let newHeight = original.height
+    let newX = original.x
+    let newY = original.y
+
+    // 반대편 모서리/변의 위치 계산
+    const rightEdge = original.x + original.width
+    const bottomEdge = original.y + original.height
+
+    switch (handleType) {
+      case 'nw': // 좌상: 우하 모서리(rightEdge, bottomEdge)가 고정
+        newWidth = rightEdge - globalPos.x
+        newHeight = bottomEdge - globalPos.y
+        newX = globalPos.x
+        newY = globalPos.y
+        break
+      case 'n': // 상: 하단 변(bottomEdge)이 고정
+        newHeight = bottomEdge - globalPos.y
+        newY = globalPos.y
+        // 너비와 X는 유지
+        break
+      case 'ne': // 우상: 좌하 모서리(original.x, bottomEdge)가 고정
+        newWidth = globalPos.x - original.x
+        newHeight = bottomEdge - globalPos.y
+        newY = globalPos.y
+        // X는 유지
+        break
+      case 'e': // 우: 좌측 변(original.x)이 고정
+        newWidth = globalPos.x - original.x
+        // 높이, X, Y는 유지
+        break
+      case 'se': // 우하: 좌상 모서리(original.x, original.y)가 고정
+        newWidth = globalPos.x - original.x
+        newHeight = globalPos.y - original.y
+        // X, Y는 유지
+        break
+      case 's': // 하: 상단 변(original.y)이 고정
+        newHeight = globalPos.y - original.y
+        // 너비, X, Y는 유지
+        break
+      case 'sw': // 좌하: 우상 모서리(rightEdge, original.y)가 고정
+        newWidth = rightEdge - globalPos.x
+        newHeight = globalPos.y - original.y
+        newX = globalPos.x
+        // Y는 유지
+        break
+      case 'w': // 좌: 우측 변(rightEdge)이 고정
+        newWidth = rightEdge - globalPos.x
+        newX = globalPos.x
+        // 높이와 Y는 유지
+        break
+    }
+
+    // 최소 크기 제한
+    const minSize = 50
+    if (newWidth < minSize) {
+      newWidth = minSize
+      if (handleType === 'nw' || handleType === 'w' || handleType === 'sw') {
+        newX = original.x + original.width - minSize
+      }
+    }
+    if (newHeight < minSize) {
+      newHeight = minSize
+      if (handleType === 'nw' || handleType === 'n' || handleType === 'ne') {
+        newY = original.y + original.height - minSize
+      }
+    }
+
+    // 스프라이트 업데이트
+    sprite.width = newWidth
+    sprite.height = newHeight
+    sprite.x = newX
+    sprite.y = newY
+
+    // 핸들 위치 업데이트 (기존 핸들 컨테이너 업데이트)
+    const existingHandles = editHandlesRef.current.get(sceneIndex)
+    if (existingHandles && sprite) {
+      const bounds = sprite.getBounds()
+      // 핸들 위치 업데이트
+      existingHandles.children.forEach((child, index) => {
+        if (child instanceof PIXI.Graphics && child.name) {
+          const handleType = child.name as 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w'
+          const handlePositions: Record<string, { x: number; y: number }> = {
+            'nw': { x: bounds.x, y: bounds.y },
+            'n': { x: bounds.x + bounds.width / 2, y: bounds.y },
+            'ne': { x: bounds.x + bounds.width, y: bounds.y },
+            'e': { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+            'se': { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+            's': { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+            'sw': { x: bounds.x, y: bounds.y + bounds.height },
+            'w': { x: bounds.x, y: bounds.y + bounds.height / 2 },
+          }
+          const pos = handlePositions[handleType]
+          if (pos) {
+            child.x = pos.x
+            child.y = pos.y
+          }
+        } else if (child instanceof PIXI.Graphics && index === existingHandles.children.length - 1) {
+          // 마지막 자식은 경계선
+          child.clear()
+          child.lineStyle(2, 0x8b5cf6, 1)
+          child.drawRect(bounds.x, bounds.y, bounds.width, bounds.height)
+        }
+      })
+    }
+
+    if (appRef.current) {
+      appRef.current.render()
+    }
+  }, [])
+
+  // 스프라이트 드래그 핸들러
+  const setupSpriteDrag = useCallback((sprite: PIXI.Sprite, sceneIndex: number) => {
+    if (!sprite) return
+
+    // 기존 이벤트 리스너 제거
+    sprite.off('pointerdown')
+    sprite.off('pointermove')
+    sprite.off('pointerup')
+    sprite.off('pointerupoutside')
+
+    sprite.interactive = true
+    sprite.cursor = editMode === 'image' ? 'move' : 'default'
+
+    if (editMode === 'image') {
+      sprite.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+        e.stopPropagation()
+        isDraggingRef.current = true
+        const globalPos = e.global
+        dragStartPosRef.current = {
+          x: globalPos.x - sprite.x,
+          y: globalPos.y - sprite.y,
+        }
+        // 편집 시작 시 원래 Transform 저장 (취소 시 복원용)
+        if (!originalSpriteTransformRef.current.has(sceneIndex)) {
+          const scene = timeline?.scenes[sceneIndex]
+          if (scene?.imageTransform) {
+            originalSpriteTransformRef.current.set(sceneIndex, scene.imageTransform)
+          } else {
+            originalSpriteTransformRef.current.set(sceneIndex, {
+              x: sprite.x,
+              y: sprite.y,
+              width: sprite.width,
+              height: sprite.height,
+              scaleX: sprite.scale.x,
+              scaleY: sprite.scale.y,
+              rotation: sprite.rotation,
+            })
+          }
+        }
+        setSelectedElementIndex(sceneIndex)
+        setSelectedElementType('image')
+        drawEditHandles(sprite, sceneIndex, handleResize, saveImageTransform)
+      })
+
+      sprite.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
+        if (isDraggingRef.current && !isResizingRef.current) {
+          const globalPos = e.global
+          sprite.x = globalPos.x - dragStartPosRef.current.x
+          sprite.y = globalPos.y - dragStartPosRef.current.y
+          if (appRef.current) {
+            appRef.current.render()
+          }
+          // 핸들 위치 업데이트
+          drawEditHandles(sprite, sceneIndex, handleResize, saveImageTransform)
+        }
+      })
+
+      sprite.on('pointerup', () => {
+        if (isDraggingRef.current) {
+          isDraggingRef.current = false
+          // 드래그 종료 시 Transform 저장하지 않음 (편집 종료 시 저장)
+        }
+      })
+
+      sprite.on('pointerupoutside', () => {
+        if (isDraggingRef.current) {
+          isDraggingRef.current = false
+          // 드래그 종료 시 Transform 저장하지 않음 (편집 종료 시 저장)
+        }
+      })
+    }
+  }, [editMode, drawEditHandles, saveImageTransform, handleResize, timeline])
+
+  // Transform 데이터 적용
+  const applyImageTransform = useCallback((sprite: PIXI.Sprite, transform?: TimelineScene['imageTransform']) => {
+    if (!transform || !sprite) return
+
+    sprite.x = transform.x
+    sprite.y = transform.y
+    sprite.width = transform.width
+    sprite.height = transform.height
+    sprite.scale.set(transform.scaleX, transform.scaleY)
+    sprite.rotation = transform.rotation
+  }, [])
+
+  // 텍스트 Transform 데이터 저장
+  const saveTextTransform = useCallback((sceneIndex: number, text: PIXI.Text) => {
+    if (!timeline || !text) return
+
+    const transform = {
+      x: text.x,
+      y: text.y,
+      width: text.width * text.scale.x,
+      height: text.height * text.scale.y,
+      scaleX: text.scale.x,
+      scaleY: text.scale.y,
+      rotation: text.rotation,
+    }
+
+    const nextTimeline: TimelineData = {
+      ...timeline,
+      scenes: timeline.scenes.map((scene, i) => {
+        if (i === sceneIndex) {
+          return {
+            ...scene,
+            text: {
+              ...scene.text,
+              transform,
+            },
+          }
+        }
+        return scene
+      }),
+    }
+    setTimeline(nextTimeline)
+  }, [timeline, setTimeline])
+
+  // 텍스트 Transform 데이터 적용
+  const applyTextTransform = useCallback((text: PIXI.Text, transform?: TimelineScene['text']['transform']) => {
+    if (!transform || !text) return
+
+    text.x = transform.x
+    text.y = transform.y
+    text.scale.set(transform.scaleX, transform.scaleY)
+    text.rotation = transform.rotation
+  }, [])
+
+  // 텍스트 리사이즈 핸들러
+  const handleTextResize = useCallback((e: PIXI.FederatedPointerEvent | MouseEvent, sceneIndex: number) => {
+    if (!isResizingTextRef.current || !resizeHandleRef.current || !originalTransformRef.current) return
+
+    const text = textsRef.current.get(sceneIndex)
+    if (!text || !appRef.current) return
+
+    // 마우스 좌표를 PixiJS 스테이지 좌표로 변환
+    let globalPos: { x: number; y: number }
+    if (e instanceof MouseEvent) {
+      const canvas = appRef.current.canvas
+      const rect = canvas.getBoundingClientRect()
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      globalPos = {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      }
+    } else {
+      const pixiEvent = e as PIXI.FederatedPointerEvent
+      globalPos = pixiEvent.global
+    }
+
+    const handleType = resizeHandleRef.current
+    const original = originalTransformRef.current
+
+    let newWidth = original.width
+    let newHeight = original.height
+    let newX = original.x
+    let newY = original.y
+
+    const rightEdge = original.x + original.width
+    const bottomEdge = original.y + original.height
+
+    switch (handleType) {
+      case 'nw':
+        newWidth = rightEdge - globalPos.x
+        newHeight = bottomEdge - globalPos.y
+        newX = globalPos.x
+        newY = globalPos.y
+        break
+      case 'n':
+        newHeight = bottomEdge - globalPos.y
+        newY = globalPos.y
+        break
+      case 'ne':
+        newWidth = globalPos.x - original.x
+        newHeight = bottomEdge - globalPos.y
+        newY = globalPos.y
+        break
+      case 'e':
+        newWidth = globalPos.x - original.x
+        break
+      case 'se':
+        newWidth = globalPos.x - original.x
+        newHeight = globalPos.y - original.y
+        break
+      case 's':
+        newHeight = globalPos.y - original.y
+        break
+      case 'sw':
+        newWidth = rightEdge - globalPos.x
+        newHeight = globalPos.y - original.y
+        newX = globalPos.x
+        break
+      case 'w':
+        newWidth = rightEdge - globalPos.x
+        newX = globalPos.x
+        break
+    }
+
+    // 최소 크기 제한
+    const minSize = 20
+    if (newWidth < minSize) {
+      newWidth = minSize
+      if (handleType === 'nw' || handleType === 'w' || handleType === 'sw') {
+        newX = original.x + original.width - minSize
+      }
+    }
+    if (newHeight < minSize) {
+      newHeight = minSize
+      if (handleType === 'nw' || handleType === 'n' || handleType === 'ne') {
+        newY = original.y + original.height - minSize
+      }
+    }
+
+    // 텍스트 스케일 계산 (원본 크기 대비)
+    const baseWidth = text.width / text.scale.x
+    const baseHeight = text.height / text.scale.y
+    const scaleX = newWidth / baseWidth
+    const scaleY = newHeight / baseHeight
+
+    text.scale.set(scaleX, scaleY)
+    text.x = newX
+    text.y = newY
+
+    // 핸들 위치 업데이트
+    const existingHandles = textEditHandlesRef.current.get(sceneIndex)
+    if (existingHandles && text) {
+      const bounds = text.getBounds()
+      existingHandles.children.forEach((child, index) => {
+        if (child instanceof PIXI.Graphics && child.name) {
+          const handleType = child.name as 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w'
+          const handlePositions: Record<string, { x: number; y: number }> = {
+            'nw': { x: bounds.x, y: bounds.y },
+            'n': { x: bounds.x + bounds.width / 2, y: bounds.y },
+            'ne': { x: bounds.x + bounds.width, y: bounds.y },
+            'e': { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+            'se': { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+            's': { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+            'sw': { x: bounds.x, y: bounds.y + bounds.height },
+            'w': { x: bounds.x, y: bounds.y + bounds.height / 2 },
+          }
+          const pos = handlePositions[handleType]
+          if (pos) {
+            child.x = pos.x
+            child.y = pos.y
+          }
+        }
+      })
+    }
+
+    if (appRef.current) {
+      appRef.current.render()
+    }
+  }, [])
+
+  // 텍스트 편집 핸들 그리기
+  const drawTextEditHandles = useCallback((text: PIXI.Text, sceneIndex: number, handleResize: (e: PIXI.FederatedPointerEvent, sceneIndex: number) => void, saveTextTransform: (sceneIndex: number, text: PIXI.Text) => void) => {
+    if (!containerRef.current || !text) return
+
+    // 기존 핸들 제거
+    const existingHandles = textEditHandlesRef.current.get(sceneIndex)
+    if (existingHandles && existingHandles.parent) {
+      existingHandles.parent.removeChild(existingHandles)
+    }
+
+    const handlesContainer = new PIXI.Container()
+    handlesContainer.interactive = true
+
+    const bounds = text.getBounds()
+    const handleSize = 16
+    const handleColor = 0x8b5cf6
+    const handleBorderColor = 0xffffff
+
+    const handles: Array<{ x: number; y: number; type: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' }> = [
+      { x: bounds.x, y: bounds.y, type: 'nw' },
+      { x: bounds.x + bounds.width / 2, y: bounds.y, type: 'n' },
+      { x: bounds.x + bounds.width, y: bounds.y, type: 'ne' },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2, type: 'e' },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height, type: 'se' },
+      { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height, type: 's' },
+      { x: bounds.x, y: bounds.y + bounds.height, type: 'sw' },
+      { x: bounds.x, y: bounds.y + bounds.height / 2, type: 'w' },
+    ]
+
+    handles.forEach((handle) => {
+      const handleGraphics = new PIXI.Graphics()
+      handleGraphics.beginFill(handleColor, 1)
+      handleGraphics.lineStyle(2, handleBorderColor, 1)
+      handleGraphics.drawRect(-handleSize / 2, -handleSize / 2, handleSize, handleSize)
+      handleGraphics.endFill()
+      handleGraphics.x = handle.x
+      handleGraphics.y = handle.y
+      handleGraphics.interactive = true
+      handleGraphics.cursor = 'pointer'
+      handleGraphics.name = handle.type
+
+      handleGraphics.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+        e.stopPropagation()
+        isResizingTextRef.current = true
+        resizeHandleRef.current = handle.type
+        const text = textsRef.current.get(sceneIndex)
+        if (text) {
+          let originalTransform
+          if (originalTextTransformRef.current.has(sceneIndex)) {
+            originalTransform = originalTextTransformRef.current.get(sceneIndex)!
+          } else {
+            const scene = timeline?.scenes[sceneIndex]
+            if (scene?.text?.transform) {
+              const transform = scene.text.transform
+              originalTransform = {
+                ...transform,
+                scaleX: transform.scaleX ?? 1,
+                scaleY: transform.scaleY ?? 1,
+              }
+            } else {
+              originalTransform = {
+                x: text.x,
+                y: text.y,
+                width: text.width * text.scale.x,
+                height: text.height * text.scale.y,
+                scaleX: text.scale.x,
+                scaleY: text.scale.y,
+                rotation: text.rotation,
+              }
+            }
+            originalTextTransformRef.current.set(sceneIndex, originalTransform)
+          }
+          
+          const bounds = text.getBounds()
+          originalTransformRef.current = {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+            scaleX: text.scale.x,
+            scaleY: text.scale.y,
+            rotation: text.rotation,
+          }
+        }
+        setSelectedElementIndex(sceneIndex)
+        setSelectedElementType('text')
+      })
+
+      const handleGlobalMove = (e: MouseEvent) => {
+        if (isResizingTextRef.current && resizeHandleRef.current === handle.type && appRef.current) {
+          const canvas = appRef.current.canvas
+          const rect = canvas.getBoundingClientRect()
+          const scaleX = canvas.width / rect.width
+          const scaleY = canvas.height / rect.height
+          const globalPos = {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY,
+          }
+          
+          const pixiEvent = {
+            global: globalPos,
+          } as PIXI.FederatedPointerEvent
+          handleResize(pixiEvent, sceneIndex)
+        }
+      }
+
+      const handleGlobalUp = () => {
+        if (isResizingTextRef.current && resizeHandleRef.current === handle.type) {
+          isResizingTextRef.current = false
+          resizeHandleRef.current = null
+          document.removeEventListener('mousemove', handleGlobalMove)
+          document.removeEventListener('mouseup', handleGlobalUp)
+        }
+      }
+
+      handleGraphics.on('pointerdown', () => {
+        document.addEventListener('mousemove', handleGlobalMove)
+        document.addEventListener('mouseup', handleGlobalUp)
+      })
+
+      handlesContainer.addChild(handleGraphics)
+    })
+
+    // 경계선 그리기
+    const borderGraphics = new PIXI.Graphics()
+    borderGraphics.lineStyle(2, handleColor, 1)
+    borderGraphics.drawRect(bounds.x, bounds.y, bounds.width, bounds.height)
+    handlesContainer.addChild(borderGraphics)
+
+    containerRef.current.addChild(handlesContainer)
+    textEditHandlesRef.current.set(sceneIndex, handlesContainer)
+  }, [timeline])
+
+  // 텍스트 드래그 설정
+  const setupTextDrag = useCallback((text: PIXI.Text, sceneIndex: number) => {
+    if (!text) return
+
+    text.off('pointerdown')
+    text.off('pointermove')
+    text.off('pointerup')
+    text.off('pointerupoutside')
+
+    text.interactive = true
+    text.cursor = editMode === 'text' ? 'move' : 'default'
+
+    if (editMode === 'text') {
+      text.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
+        e.stopPropagation()
+        isDraggingRef.current = true
+        const globalPos = e.global
+        dragStartPosRef.current = {
+          x: globalPos.x - text.x,
+          y: globalPos.y - text.y,
+        }
+        if (!originalTextTransformRef.current.has(sceneIndex)) {
+          const scene = timeline?.scenes[sceneIndex]
+          if (scene?.text?.transform) {
+            // transform에 scaleX, scaleY가 없으면 기본값 사용
+            const transform = scene.text.transform
+            originalTextTransformRef.current.set(sceneIndex, {
+              ...transform,
+              scaleX: transform.scaleX ?? 1,
+              scaleY: transform.scaleY ?? 1,
+            })
+          } else {
+            originalTextTransformRef.current.set(sceneIndex, {
+              x: text.x,
+              y: text.y,
+              width: text.width * text.scale.x,
+              height: text.height * text.scale.y,
+              scaleX: text.scale.x,
+              scaleY: text.scale.y,
+              rotation: text.rotation,
+            })
+          }
+        }
+        setSelectedElementIndex(sceneIndex)
+        setSelectedElementType('text')
+        drawTextEditHandles(text, sceneIndex, handleTextResize, saveTextTransform)
+      })
+
+      text.on('pointermove', (e: PIXI.FederatedPointerEvent) => {
+        if (isDraggingRef.current && !isResizingTextRef.current) {
+          const globalPos = e.global
+          text.x = globalPos.x - dragStartPosRef.current.x
+          text.y = globalPos.y - dragStartPosRef.current.y
+          if (appRef.current) {
+            appRef.current.render()
+          }
+          drawTextEditHandles(text, sceneIndex, handleTextResize, saveTextTransform)
+        }
+      })
+
+      text.on('pointerup', () => {
+        if (isDraggingRef.current) {
+          isDraggingRef.current = false
+        }
+      })
+
+      text.on('pointerupoutside', () => {
+        if (isDraggingRef.current) {
+          isDraggingRef.current = false
+        }
+      })
+    }
+  }, [editMode, drawTextEditHandles, saveTextTransform, handleTextResize, timeline])
+
+  // 편집 모드 변경 시 핸들 표시/숨김
+  useEffect(() => {
+    if (!containerRef.current || !timeline) return
+
+    // 편집 모드가 종료되면 핸들 제거
+    if (editMode === 'none') {
+      editHandlesRef.current.forEach((handles, index) => {
+        if (handles.parent) {
+          handles.parent.removeChild(handles)
+        }
+      })
+      editHandlesRef.current.clear()
+      textEditHandlesRef.current.forEach((handles, index) => {
+        if (handles.parent) {
+          handles.parent.removeChild(handles)
+        }
+      })
+      textEditHandlesRef.current.clear()
+      setSelectedElementIndex(null)
+      setSelectedElementType(null)
+    } else if (editMode === 'image' && selectedElementIndex !== null && selectedElementType === 'image') {
+      // 선택된 이미지 요소가 있으면 핸들 표시
+      const sprite = spritesRef.current.get(selectedElementIndex)
+      if (sprite) {
+        drawEditHandles(sprite, selectedElementIndex, handleResize, saveImageTransform)
+        setupSpriteDrag(sprite, selectedElementIndex)
+      }
+    } else if (editMode === 'text' && selectedElementIndex !== null && selectedElementType === 'text') {
+      // 선택된 텍스트 요소가 있으면 핸들 표시
+      const text = textsRef.current.get(selectedElementIndex)
+      if (text) {
+        drawTextEditHandles(text, selectedElementIndex, handleTextResize, saveTextTransform)
+        setupTextDrag(text, selectedElementIndex)
+      }
+    }
+
+    // 모든 스프라이트에 드래그 설정 적용
+    spritesRef.current.forEach((sprite, index) => {
+      setupSpriteDrag(sprite, index)
+    })
+    
+    // 모든 텍스트에 드래그 설정 적용
+    textsRef.current.forEach((text, index) => {
+      setupTextDrag(text, index)
+    })
+
+    if (appRef.current) {
+      appRef.current.render()
+    }
+  }, [editMode, selectedElementIndex, selectedElementType, timeline, drawEditHandles, setupSpriteDrag, handleResize, saveImageTransform, drawTextEditHandles, setupTextDrag, handleTextResize, saveTextTransform])
+
+
   // 고급 효과 핸들러
   const handleAdvancedEffectChange = (
     sceneIndex: number,
@@ -1614,16 +2504,245 @@ export default function Step4Page() {
           <div className="p-4 border-b shrink-0" style={{
             borderColor: theme === 'dark' ? '#374151' : '#e5e7eb'
           }}>
-            <h2 className="text-lg font-semibold" style={{
-              color: theme === 'dark' ? '#ffffff' : '#111827'
-            }}>
-              미리보기
-            </h2>
-          </div>
-          
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold" style={{
+                color: theme === 'dark' ? '#ffffff' : '#111827'
+              }}>
+                미리보기
+              </h2>
+              {/* 편집 모드 토글 */}
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    const newMode = editMode === 'text' ? 'none' : 'text'
+                    if (newMode === 'none') {
+                      // 텍스트 편집 종료 시 현재 씬 인덱스 저장 (변경 방지)
+                      const savedSceneIndex = currentSceneIndex
+                      savedSceneIndexRef.current = savedSceneIndex
+                      
+                      // 자동 씬 인덱스 계산 방지
+                      isManualSceneSelectRef.current = true
+                      
+                      // 모든 편집된 텍스트의 Transform 수집
+                      const transformsToSave = new Map<number, { x: number; y: number; width: number; height: number; scaleX: number; scaleY: number; rotation: number }>()
+                      
+                      // 선택된 요소의 Transform 저장
+                      if (selectedElementIndex !== null && selectedElementType === 'text') {
+                        const text = textsRef.current.get(selectedElementIndex)
+                        if (text) {
+                          transformsToSave.set(selectedElementIndex, {
+                            x: text.x,
+                            y: text.y,
+                            width: text.width * text.scale.x,
+                            height: text.height * text.scale.y,
+                            scaleX: text.scale.x,
+                            scaleY: text.scale.y,
+                            rotation: text.rotation,
+                          })
+                        }
+                      }
+                      
+                      // 모든 편집된 텍스트의 Transform 수집
+                      textsRef.current.forEach((text, index) => {
+                        if (originalTextTransformRef.current.has(index)) {
+                          transformsToSave.set(index, {
+                            x: text.x,
+                            y: text.y,
+                            width: text.width * text.scale.x,
+                            height: text.height * text.scale.y,
+                            scaleX: text.scale.x,
+                            scaleY: text.scale.y,
+                            rotation: text.rotation,
+                          })
+                        }
+                      })
+                      
+                      // 모든 Transform을 한 번에 저장
+                      if (transformsToSave.size > 0 && timeline) {
+                        isSavingTransformRef.current = true
+                        const nextTimeline: TimelineData = {
+                          ...timeline,
+                          scenes: timeline.scenes.map((scene, i) => {
+                            if (transformsToSave.has(i)) {
+                              const transform = transformsToSave.get(i)!
+                              return {
+                                ...scene,
+                                text: {
+                                  ...scene.text,
+                                  transform,
+                                },
+                              }
+                            }
+                            return scene
+                          }),
+                        }
+                        setTimeline(nextTimeline)
+                        setTimeout(() => {
+                          isSavingTransformRef.current = false
+                        }, 100)
+                      }
+                      
+                      originalTextTransformRef.current.clear()
+                      setSelectedElementIndex(null)
+                      setSelectedElementType(null)
+                      
+                      // 씬 인덱스 강제 복원 및 자동 계산 방지 해제
+                      setTimeout(() => {
+                        if (currentSceneIndex !== savedSceneIndex) {
+                          setCurrentSceneIndex(savedSceneIndex)
+                        }
+                        setTimeout(() => {
+                          isManualSceneSelectRef.current = false
+                        }, 100)
+                      }, 200)
+                    } else {
+                      // 텍스트 편집 모드 시작 시 모든 텍스트의 원래 Transform 저장
+                      originalTextTransformRef.current.clear()
+                      if (timeline) {
+                        textsRef.current.forEach((text, index) => {
+                          const scene = timeline.scenes[index]
+                          if (scene?.text?.transform) {
+                            const transform = scene.text.transform
+                            originalTextTransformRef.current.set(index, {
+                              ...transform,
+                              scaleX: transform.scaleX ?? 1,
+                              scaleY: transform.scaleY ?? 1,
+                            })
+                          } else if (text) {
+                            originalTextTransformRef.current.set(index, {
+                              x: text.x,
+                              y: text.y,
+                              width: text.width * text.scale.x,
+                              height: text.height * text.scale.y,
+                              scaleX: text.scale.x,
+                              scaleY: text.scale.y,
+                              rotation: text.rotation,
+                            })
+                          }
+                        })
+                      }
+                    }
+                    setEditMode(newMode)
+                  }}
+                  variant={editMode === 'text' ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                >
+                  <Type className="w-3 h-3 mr-1" />
+                  {editMode === 'text' ? '텍스트 편집 종료' : '텍스트 편집'}
+                </Button>
+                <Button
+                  onClick={() => {
+                    const newMode = editMode === 'image' ? 'none' : 'image'
+                    if (newMode === 'none') {
+                      // 편집 종료 시 현재 씬 인덱스 저장 (변경 방지)
+                      const savedSceneIndex = currentSceneIndex
+                      savedSceneIndexRef.current = savedSceneIndex
+                      
+                      // 자동 씬 인덱스 계산 방지
+                      isManualSceneSelectRef.current = true
+                      
+                      // 모든 편집된 스프라이트의 Transform 수집
+                      const transformsToSave = new Map<number, { x: number; y: number; width: number; height: number; scaleX: number; scaleY: number; rotation: number }>()
+                      
+                      // 선택된 요소의 Transform 저장
+                      if (selectedElementIndex !== null && selectedElementType === 'image') {
+                        const sprite = spritesRef.current.get(selectedElementIndex)
+                        if (sprite) {
+                          transformsToSave.set(selectedElementIndex, {
+                            x: sprite.x,
+                            y: sprite.y,
+                            width: sprite.width,
+                            height: sprite.height,
+                            scaleX: sprite.scale.x,
+                            scaleY: sprite.scale.y,
+                            rotation: sprite.rotation,
+                          })
+                        }
+                      }
+                      
+                      // 모든 편집된 스프라이트의 Transform 수집
+                      spritesRef.current.forEach((sprite, index) => {
+                        if (originalSpriteTransformRef.current.has(index)) {
+                          transformsToSave.set(index, {
+                            x: sprite.x,
+                            y: sprite.y,
+                            width: sprite.width,
+                            height: sprite.height,
+                            scaleX: sprite.scale.x,
+                            scaleY: sprite.scale.y,
+                            rotation: sprite.rotation,
+                          })
+                        }
+                      })
+                      
+                      // 모든 Transform을 한 번에 저장
+                      if (transformsToSave.size > 0) {
+                        saveAllImageTransforms(transformsToSave)
+                      }
+                      
+                      originalSpriteTransformRef.current.clear()
+                      setSelectedElementIndex(null)
+                      setSelectedElementType(null)
+                      
+                      // 씬 인덱스 강제 복원 및 자동 계산 방지 해제
+                      setTimeout(() => {
+                        if (currentSceneIndex !== savedSceneIndex) {
+                          setCurrentSceneIndex(savedSceneIndex)
+                        }
+                        // 자동 계산 방지 해제는 조금 더 늦게
+                        setTimeout(() => {
+                          isManualSceneSelectRef.current = false
+                        }, 100)
+                      }, 200)
+                    } else {
+                      // 편집 모드 시작 시 모든 스프라이트의 원래 Transform 저장
+                      originalSpriteTransformRef.current.clear()
+                      if (timeline) {
+                        spritesRef.current.forEach((sprite, index) => {
+                          const scene = timeline.scenes[index]
+                          if (scene?.imageTransform) {
+                            originalSpriteTransformRef.current.set(index, scene.imageTransform)
+                          } else if (sprite) {
+                            // timeline에 Transform이 없으면 현재 스프라이트 위치 저장
+                            originalSpriteTransformRef.current.set(index, {
+                              x: sprite.x,
+                              y: sprite.y,
+                              width: sprite.width,
+                              height: sprite.height,
+                              scaleX: sprite.scale.x,
+                              scaleY: sprite.scale.y,
+                              rotation: sprite.rotation,
+                            })
+                          }
+                        })
+                      }
+                    }
+                    setEditMode(newMode)
+                  }}
+                  variant={editMode === 'image' ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  {editMode === 'image' ? '편집 종료' : '이미지 편집'}
+                </Button>
+              </div>
+            </div>
+                        </div>
+
           <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden min-h-0">
             {/* PixiJS 미리보기 */}
-            <div className="flex-1 flex items-center justify-center bg-black rounded-lg overflow-hidden min-h-0">
+            <div 
+              className="flex-1 flex items-center justify-center bg-black rounded-lg overflow-hidden min-h-0"
+              onClick={(e) => {
+                // 편집 모드일 때 캔버스 배경 클릭 시 선택만 해제 (편집 모드는 유지)
+                if (editMode === 'image' && e.target === e.currentTarget) {
+                  setSelectedElementIndex(null)
+                  setSelectedElementType(null)
+                }
+              }}
+            >
               <div
                 ref={pixiContainerRef}
                 className="w-full h-full"
@@ -1633,8 +2752,8 @@ export default function Step4Page() {
                   maxHeight: '100%',
                   objectFit: 'contain'
                 }}
-              />
-            </div>
+                        />
+                      </div>
 
             {/* 재생 컨트롤 */}
             <div className="space-y-2">
@@ -1655,52 +2774,52 @@ export default function Step4Page() {
                     return formatTime(actualDuration)
                   })()}
                 </span>
-              </div>
+                        </div>
               
-              <div
-                ref={timelineBarRef}
+                        <div
+                          ref={timelineBarRef}
                 className="w-full h-2 rounded-full cursor-pointer relative"
                 style={{
                   backgroundColor: theme === 'dark' ? '#374151' : '#e5e7eb'
                 }}
-                onMouseDown={handleTimelineMouseDown}
-              >
-                <div
+                          onMouseDown={handleTimelineMouseDown}
+                        >
+                          <div
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${progressRatio * 100}%`,
                     backgroundColor: '#8b5cf6'
                   }}
                 />
-              </div>
+                        </div>
 
               <div className="flex items-center gap-2">
-                <Button
-                  onClick={handlePlayPause}
-                  variant="outline"
-                  size="sm"
+                        <Button
+                          onClick={handlePlayPause}
+                          variant="outline"
+                          size="sm"
                   className="flex-1"
-                >
-                  {isPlaying ? (
-                    <>
+                        >
+                          {isPlaying ? (
+                            <>
                       <Pause className="w-4 h-4 mr-2" />
-                      일시정지
-                    </>
-                  ) : (
-                    <>
+                              일시정지
+                            </>
+                          ) : (
+                            <>
                       <Play className="w-4 h-4 mr-2" />
-                      재생
-                    </>
-                  )}
-                </Button>
-                <Button
+                              재생
+                            </>
+                          )}
+                        </Button>
+                        <Button
                   onClick={handleExport}
-                  size="sm"
+                          size="sm"
                   className="flex-1"
-                >
+                        >
                   내보내기
-                </Button>
-              </div>
+                        </Button>
+                      </div>
               
               {/* 배속 선택 */}
               <div className="flex items-center gap-2">
@@ -1741,8 +2860,8 @@ export default function Step4Page() {
                     return `실제 재생: ${formatTime(totalTime)}`
                   })()}
                 </span>
+                    </div>
               </div>
-            </div>
 
             {/* 선택된 애셋 정보 */}
             {timeline && timeline.scenes[currentSceneIndex] && (
@@ -1778,21 +2897,21 @@ export default function Step4Page() {
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 min-h-0">
-            {scenes.length === 0 ? (
+                    {scenes.length === 0 ? (
               <div className="text-center py-8 text-sm" style={{
                 color: theme === 'dark' ? '#9ca3af' : '#6b7280'
               }}>
-                Step3에서 이미지와 스크립트를 먼저 생성해주세요.
+                        Step3에서 이미지와 스크립트를 먼저 생성해주세요.
               </div>
-            ) : (
+                    ) : (
               <div className="space-y-3">
-                {scenes.map((scene, index) => {
-                  const isActive = currentSceneIndex === index
+                        {scenes.map((scene, index) => {
+                          const isActive = currentSceneIndex === index
                   const sceneData = timeline?.scenes[index]
                   
-                  return (
-                    <div
-                      key={scene.sceneId ?? index}
+                          return (
+                            <div
+                              key={scene.sceneId ?? index}
                       className="rounded-lg border p-3 cursor-pointer transition-colors"
                       style={{
                         borderColor: isActive 
@@ -1802,19 +2921,19 @@ export default function Step4Page() {
                           ? (theme === 'dark' ? '#3b1f5f' : '#f3e8ff')
                           : (theme === 'dark' ? '#1f2937' : '#ffffff')
                       }}
-                      onClick={() => handleSceneSelect(index)}
-                    >
+                              onClick={() => handleSceneSelect(index)}
+                            >
                       <div className="flex gap-3">
                         {/* 썸네일 */}
                         <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-200 shrink-0">
                           {sceneThumbnails[index] && (
                             <img
                               src={sceneThumbnails[index]}
-                              alt={`Scene ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
+                                    alt={`Scene ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
                           )}
-                        </div>
+                              </div>
 
                         {/* 씬 정보 */}
                         <div className="flex-1 min-w-0">
@@ -1827,8 +2946,8 @@ export default function Step4Page() {
                                 color: theme === 'dark' ? '#ffffff' : '#111827'
                               }}>
                                 씬 {index + 1}
-                              </span>
-                            </div>
+                                      </span>
+                                    </div>
                           </div>
 
                           {/* 텍스트 입력 */}
@@ -1836,7 +2955,7 @@ export default function Step4Page() {
                             rows={2}
                             value={scene.script}
                             onChange={(e) => handleSceneScriptChange(index, e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
+                                      onClick={(e) => e.stopPropagation()}
                             className="w-full text-sm rounded-md border px-2 py-1 resize-none mb-2"
                             style={{
                               backgroundColor: theme === 'dark' ? '#111827' : '#ffffff',
@@ -1857,32 +2976,32 @@ export default function Step4Page() {
                               }}
                             >
                               {transitionLabels[sceneData?.transition || 'fade'] || '페이드'}
-                            </span>
-                            <select
+                                  </span>
+                                  <select
                               value={sceneData?.imageFit || 'fill'}
                               onChange={(e) => handleSceneImageFitChange(index, e.target.value as 'cover' | 'contain' | 'fill')}
-                              onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
                               className="px-2 py-1 rounded border text-xs"
                               style={{
                                 backgroundColor: theme === 'dark' ? '#111827' : '#ffffff',
                                 borderColor: theme === 'dark' ? '#374151' : '#d1d5db',
                                 color: theme === 'dark' ? '#ffffff' : '#111827'
                               }}
-                            >
-                              <option value="cover">Cover</option>
-                              <option value="contain">Contain</option>
-                              <option value="fill">Fill</option>
-                            </select>
-                          </div>
+                                  >
+                                    <option value="cover">Cover</option>
+                                    <option value="contain">Contain</option>
+                                    <option value="fill">Fill</option>
+                                  </select>
+                                </div>
                         </div>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    </div>
-                  )
-                })}
+                    )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
         {/* 오른쪽 패널: 효과 선택 */}
         <div className="w-[30%] flex flex-col h-full overflow-hidden" style={{
@@ -1896,7 +3015,7 @@ export default function Step4Page() {
             }}>
               효과
             </h2>
-          </div>
+        </div>
 
           <div className="flex-1 overflow-y-auto min-h-0">
             <Tabs value={rightPanelTab} onValueChange={setRightPanelTab} className="p-4">
@@ -2154,6 +3273,366 @@ export default function Step4Page() {
                     ))}
                   </div>
                 </div>
+
+                {/* 텍스트 스타일 편집 (텍스트 선택 시에만 표시) */}
+                {editMode === 'text' && selectedElementIndex !== null && selectedElementType === 'text' && timeline && (
+                  <div className="space-y-4 mt-6 pt-6 border-t" style={{
+                    borderColor: theme === 'dark' ? '#374151' : '#e5e7eb'
+                  }}>
+                    <h3 className="text-sm font-semibold mb-2" style={{
+                      color: theme === 'dark' ? '#ffffff' : '#111827'
+                    }}>
+                      텍스트 스타일
+                    </h3>
+
+                    {/* 폰트 선택 */}
+                    <div>
+                      <label className="text-xs mb-1 block" style={{
+                        color: theme === 'dark' ? '#d1d5db' : '#374151'
+                      }}>
+                        폰트
+                      </label>
+                      <select
+                        value={timeline.scenes[selectedElementIndex]?.text?.font || 'Arial'}
+                        onChange={(e) => {
+                          if (timeline && selectedElementIndex >= 0) {
+                            const nextTimeline: TimelineData = {
+                              ...timeline,
+                              scenes: timeline.scenes.map((scene, i) => {
+                                if (i === selectedElementIndex) {
+                                  return {
+                                    ...scene,
+                                    text: {
+                                      ...scene.text,
+                                      font: e.target.value,
+                                    },
+                                  }
+                                }
+                                return scene
+                              }),
+                            }
+                            setTimeline(nextTimeline)
+                            // 텍스트 스타일 업데이트
+                            const text = textsRef.current.get(selectedElementIndex)
+                            if (text) {
+                              const currentStyle = text.style as PIXI.TextStyle
+                              text.style = new PIXI.TextStyle({
+                                ...currentStyle,
+                                fontFamily: e.target.value,
+                              })
+                              if (appRef.current) {
+                                appRef.current.render()
+                              }
+                            }
+                          }
+                        }}
+                        className="w-full px-2 py-1 rounded border text-xs"
+                        style={{
+                          backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
+                          borderColor: theme === 'dark' ? '#374151' : '#d1d5db',
+                          color: theme === 'dark' ? '#ffffff' : '#111827'
+                        }}
+                      >
+                        <option value="Arial">Arial</option>
+                        <option value="Helvetica">Helvetica</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Palatino">Palatino</option>
+                        <option value="Garamond">Garamond</option>
+                      </select>
+                    </div>
+
+                    {/* 폰트 크기 */}
+                    <div>
+                      <label className="text-xs mb-1 block" style={{
+                        color: theme === 'dark' ? '#d1d5db' : '#374151'
+                      }}>
+                        크기: {timeline.scenes[selectedElementIndex]?.text?.fontSize || 32}px
+                      </label>
+                      <input
+                        type="range"
+                        min="12"
+                        max="120"
+                        value={timeline.scenes[selectedElementIndex]?.text?.fontSize || 32}
+                        onChange={(e) => {
+                          if (timeline && selectedElementIndex >= 0) {
+                            const fontSize = parseInt(e.target.value)
+                            const nextTimeline: TimelineData = {
+                              ...timeline,
+                              scenes: timeline.scenes.map((scene, i) => {
+                                if (i === selectedElementIndex) {
+                                  return {
+                                    ...scene,
+                                    text: {
+                                      ...scene.text,
+                                      fontSize,
+                                    },
+                                  }
+                                }
+                                return scene
+                              }),
+                            }
+                            setTimeline(nextTimeline)
+                            // 텍스트 크기 업데이트
+                            const text = textsRef.current.get(selectedElementIndex)
+                            if (text) {
+                              const currentStyle = text.style as PIXI.TextStyle
+                              text.style = new PIXI.TextStyle({
+                                ...currentStyle,
+                                fontSize,
+                              })
+                              if (appRef.current) {
+                                appRef.current.render()
+                              }
+                            }
+                          }
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* 색상 선택 */}
+                    <div>
+                      <label className="text-xs mb-1 block" style={{
+                        color: theme === 'dark' ? '#d1d5db' : '#374151'
+                      }}>
+                        색상
+                      </label>
+                      <div className="grid grid-cols-4 gap-2 mb-2">
+                        {['#ffffff', '#000000', '#ff0000', '#0000ff', '#00ff00', '#ffff00', '#ff00ff', '#00ffff'].map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => {
+                              if (timeline && selectedElementIndex >= 0) {
+                                const nextTimeline: TimelineData = {
+                                  ...timeline,
+                                  scenes: timeline.scenes.map((scene, i) => {
+                                    if (i === selectedElementIndex) {
+                                      return {
+                                        ...scene,
+                                        text: {
+                                          ...scene.text,
+                                          color,
+                                        },
+                                      }
+                                    }
+                                    return scene
+                                  }),
+                                }
+                                setTimeline(nextTimeline)
+                                // 텍스트 색상 업데이트
+                                const text = textsRef.current.get(selectedElementIndex)
+                                if (text) {
+                                  const currentStyle = text.style as PIXI.TextStyle
+                                  text.style = new PIXI.TextStyle({
+                                    ...currentStyle,
+                                    fill: color,
+                                  })
+                                  if (appRef.current) {
+                                    appRef.current.render()
+                                  }
+                                }
+                              }
+                            }}
+                            className={`p-3 rounded-lg border-2 transition-colors ${
+                              timeline.scenes[selectedElementIndex]?.text?.color === color ? 'border-purple-500' : ''
+                            }`}
+                            style={{
+                              backgroundColor: color,
+                              borderColor: timeline.scenes[selectedElementIndex]?.text?.color === color ? '#8b5cf6' : (theme === 'dark' ? '#374151' : '#e5e7eb')
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <input
+                        type="color"
+                        value={timeline.scenes[selectedElementIndex]?.text?.color || '#ffffff'}
+                        onChange={(e) => {
+                          if (timeline && selectedElementIndex >= 0) {
+                            const nextTimeline: TimelineData = {
+                              ...timeline,
+                              scenes: timeline.scenes.map((scene, i) => {
+                                if (i === selectedElementIndex) {
+                                  return {
+                                    ...scene,
+                                    text: {
+                                      ...scene.text,
+                                      color: e.target.value,
+                                    },
+                                  }
+                                }
+                                return scene
+                              }),
+                            }
+                            setTimeline(nextTimeline)
+                            // 텍스트 색상 업데이트
+                            const text = textsRef.current.get(selectedElementIndex)
+                            if (text) {
+                              const currentStyle = text.style as PIXI.TextStyle
+                              text.style = new PIXI.TextStyle({
+                                ...currentStyle,
+                                fill: e.target.value,
+                              })
+                              if (appRef.current) {
+                                appRef.current.render()
+                              }
+                            }
+                          }
+                        }}
+                        className="w-full h-8 rounded border"
+                        style={{
+                          borderColor: theme === 'dark' ? '#374151' : '#d1d5db'
+                        }}
+                      />
+                    </div>
+
+                    {/* 정렬 */}
+                    <div>
+                      <label className="text-xs mb-1 block" style={{
+                        color: theme === 'dark' ? '#d1d5db' : '#374151'
+                      }}>
+                        정렬
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { value: 'left', icon: AlignLeft, label: '왼쪽' },
+                          { value: 'center', icon: AlignCenter, label: '중앙' },
+                          { value: 'right', icon: AlignRight, label: '오른쪽' },
+                          { value: 'justify', icon: AlignJustify, label: '양쪽' },
+                        ].map(({ value, icon: Icon, label }) => (
+                          <button
+                            key={value}
+                            onClick={() => {
+                              if (timeline && selectedElementIndex >= 0) {
+                                const nextTimeline: TimelineData = {
+                                  ...timeline,
+                                  scenes: timeline.scenes.map((scene, i) => {
+                                    if (i === selectedElementIndex) {
+                                      return {
+                                        ...scene,
+                                        text: {
+                                          ...scene.text,
+                                          style: {
+                                            ...scene.text.style,
+                                            align: value as 'left' | 'center' | 'right' | 'justify',
+                                          },
+                                        },
+                                      }
+                                    }
+                                    return scene
+                                  }),
+                                }
+                                setTimeline(nextTimeline)
+                                // 텍스트 정렬 업데이트
+                                const text = textsRef.current.get(selectedElementIndex)
+                                if (text) {
+                                  const currentStyle = text.style as PIXI.TextStyle
+                                  text.style = new PIXI.TextStyle({
+                                    ...currentStyle,
+                                    align: value as PIXI.TextStyleAlign,
+                                  })
+                                  if (appRef.current) {
+                                    appRef.current.render()
+                                  }
+                                }
+                              }
+                            }}
+                            className={`flex-1 p-2 rounded-lg border text-xs transition-colors flex items-center justify-center gap-1 ${
+                              timeline.scenes[selectedElementIndex]?.text?.style?.align === value
+                                ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500'
+                                : ''
+                            } hover:bg-purple-50 dark:hover:bg-purple-900/20`}
+                            style={{
+                              borderColor: timeline.scenes[selectedElementIndex]?.text?.style?.align === value
+                                ? '#8b5cf6'
+                                : (theme === 'dark' ? '#374151' : '#e5e7eb'),
+                              color: theme === 'dark' ? '#d1d5db' : '#374151'
+                            }}
+                          >
+                            <Icon className="w-3 h-3" />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 스타일 (굵기, 기울임, 밑줄) */}
+                    <div>
+                      <label className="text-xs mb-1 block" style={{
+                        color: theme === 'dark' ? '#d1d5db' : '#374151'
+                      }}>
+                        스타일
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { key: 'bold', icon: Bold, label: '굵게' },
+                          { key: 'italic', icon: Italic, label: '기울임' },
+                          { key: 'underline', icon: Underline, label: '밑줄' },
+                        ].map(({ key, icon: Icon, label }) => {
+                          const isActive = timeline.scenes[selectedElementIndex]?.text?.style?.[key as 'bold' | 'italic' | 'underline'] || false
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => {
+                                if (timeline && selectedElementIndex >= 0) {
+                                  const nextTimeline: TimelineData = {
+                                    ...timeline,
+                                    scenes: timeline.scenes.map((scene, i) => {
+                                      if (i === selectedElementIndex) {
+                                        return {
+                                          ...scene,
+                                          text: {
+                                            ...scene.text,
+                                            style: {
+                                              ...scene.text.style,
+                                              [key]: !isActive,
+                                            },
+                                          },
+                                        }
+                                      }
+                                      return scene
+                                    }),
+                                  }
+                                  setTimeline(nextTimeline)
+                                  // 텍스트 스타일 업데이트
+                                  const text = textsRef.current.get(selectedElementIndex)
+                                  if (text) {
+                                    const currentStyle = text.style as PIXI.TextStyle
+                                    text.style = new PIXI.TextStyle({
+                                      ...currentStyle,
+                                      fontWeight: key === 'bold' ? (!isActive ? 'bold' : 'normal') : currentStyle.fontWeight,
+                                      fontStyle: key === 'italic' ? (!isActive ? 'italic' : 'normal') : currentStyle.fontStyle,
+                                      // PixiJS는 underline을 직접 지원하지 않으므로 dropShadow나 다른 방법 사용
+                                    })
+                                    if (appRef.current) {
+                                      appRef.current.render()
+                                    }
+                                  }
+                                }
+                              }}
+                              className={`flex-1 p-2 rounded-lg border text-xs transition-colors flex items-center justify-center gap-1 ${
+                                isActive
+                                  ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500'
+                                  : ''
+                              } hover:bg-purple-50 dark:hover:bg-purple-900/20`}
+                              style={{
+                                borderColor: isActive
+                                  ? '#8b5cf6'
+                                  : (theme === 'dark' ? '#374151' : '#e5e7eb'),
+                                color: theme === 'dark' ? '#d1d5db' : '#374151'
+                              }}
+                            >
+                              <Icon className="w-3 h-3" />
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>

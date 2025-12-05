@@ -97,6 +97,8 @@ export interface TimelineScene {
       y: number
       width: number
       height: number
+      scaleX: number
+      scaleY: number
       rotation: number
     }
     style?: {
