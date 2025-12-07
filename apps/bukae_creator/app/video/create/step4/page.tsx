@@ -136,6 +136,7 @@ export default function Step4Page() {
     const hasChanged = 
       !timeline ||
       timeline.scenes.length !== nextTimeline.scenes.length ||
+      timeline.playbackSpeed !== nextTimeline.playbackSpeed ||
       nextTimeline.scenes.some((scene, index) => {
         const existing = timeline.scenes[index]
         return (
@@ -1158,10 +1159,6 @@ export default function Step4Page() {
   }, [pixiReady, timeline, loadAllScenes])
   
   // timeline 변경 시 저장된 씬 인덱스 복원 (더 이상 필요 없음 - 편집 종료 버튼에서 직접 처리)
-
-  useEffect(() => {
-    updateCurrentScene()
-  }, [updateCurrentScene])
 
   // 현재 씬의 시작 시간 계산
   const getSceneStartTime = useCallback((sceneIndex: number) => {

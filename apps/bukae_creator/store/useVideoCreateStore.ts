@@ -245,11 +245,11 @@ export const useVideoCreateStore = create<VideoCreateState>((set) => ({
       const existingDetailImages = state.productDetailImages[product.id]
 
       return {
-        selectedProducts: [product],
-        productNames: { [product.id]: product.name },
-        productVideos: existingVideos ? { [product.id]: existingVideos } : {},
-        productImages: existingImages ? { [product.id]: existingImages } : {},
-        productDetailImages: existingDetailImages ? { [product.id]: existingDetailImages } : {},
+        selectedProducts: [...state.selectedProducts, product],
+        productNames: { ...state.productNames, [product.id]: product.name },
+        productVideos: existingVideos ? { ...state.productVideos, [product.id]: existingVideos } : state.productVideos,
+        productImages: existingImages ? { ...state.productImages, [product.id]: existingImages } : state.productImages,
+        productDetailImages: existingDetailImages ? { ...state.productDetailImages, [product.id]: existingDetailImages } : state.productDetailImages,
       }
     }),
   removeProduct: (productId) =>

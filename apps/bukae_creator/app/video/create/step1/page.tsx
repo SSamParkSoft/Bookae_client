@@ -227,7 +227,7 @@ export default function Step1Page() {
   // Step1 진입 시 store의 selectedProducts 초기화
   useEffect(() => {
     clearProducts()
-  }, [clearProducts])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // API에서 상품 목록 가져오기
   const { data: apiProducts, isLoading: isLoadingApi, error: apiError } = useProducts()

@@ -296,7 +296,7 @@ export default function HomePage() {
                       ? 'bg-gradient-to-br from-purple-600/80 to-purple-400/20 hover:from-purple-400/70 hover:to-purple-500/70' 
                       : 'bg-gradient-to-br from-purple-200/20 to-purple-400/80 hover:from-purple-200/70 hover:to-purple-300/70'
                   }`}
-                  onClick={() => router.push('/video/create')}
+                  onClick={handleStartVideoCreate}
                 >
                   <Card 
                     className={`h-full border-0 cursor-pointer transition-all rounded-lg ${
@@ -307,7 +307,6 @@ export default function HomePage() {
                   >
                   <CardHeader
                     className="h-full flex flex-col justify-center cursor-pointer"
-                    onClick={handleStartVideoCreate}
                   >
                       <div className="flex flex-col items-center gap-5">
                         <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
