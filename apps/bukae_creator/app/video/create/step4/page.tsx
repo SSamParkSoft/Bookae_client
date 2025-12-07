@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Play, Pause, Volume2, Image as ImageIcon, Clock, Edit2, GripVertical, Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify } from 'lucide-react'
+import { Play, Pause, Volume2, Image as ImageIcon, Clock, Edit2, GripVertical, Type, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Sparkles, Grid3x3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -58,6 +58,7 @@ export default function Step4Page() {
   const savedSceneIndexRef = useRef<number | null>(null) // 편집 종료 시 씬 인덱스 저장
   const textEditHandlesRef = useRef<Map<number, PIXI.Container>>(new Map()) // 텍스트 편집 핸들 컨테이너 (씬별)
   const isResizingTextRef = useRef(false) // 텍스트 리사이즈 중 플래그
+  const gridGraphicsRef = useRef<PIXI.Graphics | null>(null) // 격자 Graphics 객체
   
   // State
   const [isPlaying, setIsPlaying] = useState(false)
@@ -70,6 +71,7 @@ export default function Step4Page() {
   const [editMode, setEditMode] = useState<'none' | 'image' | 'text'>('none')
   const [selectedElementIndex, setSelectedElementIndex] = useState<number | null>(null)
   const [selectedElementType, setSelectedElementType] = useState<'image' | 'text' | null>(null)
+  const [showGrid, setShowGrid] = useState(false) // 격자 표시 여부
   const timelineBarRef = useRef<HTMLDivElement>(null)
   const [pixiReady, setPixiReady] = useState(false)
   const rafIdRef = useRef<number | null>(null)
@@ -2271,6 +2273,56 @@ export default function Step4Page() {
     }
   }, [editMode, selectedElementIndex, selectedElementType, timeline, drawEditHandles, setupSpriteDrag, handleResize, saveImageTransform, drawTextEditHandles, setupTextDrag, handleTextResize, saveTextTransform])
 
+  // 격자 그리기 함수
+  const drawGrid = useCallback(() => {
+    if (!containerRef.current || !appRef.current) return
+
+    // 기존 격자 제거
+    if (gridGraphicsRef.current && gridGraphicsRef.current.parent) {
+      gridGraphicsRef.current.parent.removeChild(gridGraphicsRef.current)
+      gridGraphicsRef.current.destroy()
+      gridGraphicsRef.current = null
+    }
+
+    if (!showGrid) return
+
+    const { width, height } = stageDimensions
+    const gridGraphics = new PIXI.Graphics()
+    
+    // 격자 색상 (반투명 흰색)
+    const gridColor = 0xffffff
+    const gridAlpha = 0.3
+    const gridLineWidth = 1
+
+    // 3x3 격자 그리기 (Rule of Thirds)
+    // 수직선 2개 (1/3, 2/3 위치)
+    gridGraphics.lineStyle(gridLineWidth, gridColor, gridAlpha)
+    gridGraphics.moveTo(width / 3, 0)
+    gridGraphics.lineTo(width / 3, height)
+    gridGraphics.moveTo(width * 2 / 3, 0)
+    gridGraphics.lineTo(width * 2 / 3, height)
+    
+    // 수평선 2개 (1/3, 2/3 위치)
+    gridGraphics.moveTo(0, height / 3)
+    gridGraphics.lineTo(width, height / 3)
+    gridGraphics.moveTo(0, height * 2 / 3)
+    gridGraphics.lineTo(width, height * 2 / 3)
+
+    // 격자를 가장 위 레이어에 추가
+    gridGraphics.zIndex = 1000
+    containerRef.current.addChild(gridGraphics)
+    gridGraphicsRef.current = gridGraphics
+
+    if (appRef.current) {
+      appRef.current.render()
+    }
+  }, [showGrid, stageDimensions])
+
+  // 격자 표시/숨김
+  useEffect(() => {
+    if (!pixiReady) return
+    drawGrid()
+  }, [showGrid, pixiReady, drawGrid])
 
   // 고급 효과 핸들러
   const handleAdvancedEffectChange = (
@@ -2889,11 +2941,101 @@ export default function Step4Page() {
           <div className="p-4 border-b shrink-0" style={{
             borderColor: theme === 'dark' ? '#374151' : '#e5e7eb'
           }}>
-            <h2 className="text-lg font-semibold" style={{
-              color: theme === 'dark' ? '#ffffff' : '#111827'
-            }}>
-              씬 리스트
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold" style={{
+                color: theme === 'dark' ? '#ffffff' : '#111827'
+              }}>
+                씬 리스트
+              </h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowGrid(!showGrid)}
+                  variant={showGrid ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs"
+                >
+                  <Grid3x3 className="w-3 h-3 mr-1" />
+                  격자
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!timeline || scenes.length === 0) return
+                    
+                    // 쇼츠용 추천 템플릿 적용
+                    const { width, height } = stageDimensions
+                    
+                    // 모든 씬에 템플릿 적용
+                    const updatedScenes = timeline.scenes.map((scene) => {
+                      // 이미지 Transform: 상단 15%부터 시작, 가로 100%, 높이 70% (하단 15% 여백)
+                      // contain 모드로 이미지 비율 유지하면서 영역 내에 맞춤
+                      const imageTransform = {
+                        x: 0, // 왼쪽 끝 (0%)
+                        y: height * 0.15, // 상단에서 15% 위치
+                        width: width, // 전체 너비 (100%)
+                        height: height * 0.7, // 높이의 70% (상단 15% + 이미지 70% + 하단 15% = 100%)
+                        scaleX: 1,
+                        scaleY: 1,
+                        rotation: 0,
+                      }
+                      
+                      // 텍스트 Transform: 하단 중앙 위치 (비율 기반)
+                      // 텍스트는 하단에서 약 8% 위에 위치, 너비는 75%
+                      const textY = height * 0.92 // 하단에서 8% 위 (92% 위치)
+                      const textWidth = width * 0.75 // 화면 너비의 75%
+                      const textHeight = height * 0.07 // 화면 높이의 7%
+                      
+                      const textTransform = {
+                        x: width * 0.5, // 중앙 (50%)
+                        y: textY,
+                        width: textWidth,
+                        height: textHeight,
+                        scaleX: 1,
+                        scaleY: 1,
+                        rotation: 0,
+                      }
+                      
+                      return {
+                        ...scene,
+                        imageFit: 'contain' as const, // 이미지 비율 유지하면서 영역 내에 맞춤
+                        imageTransform,
+                        text: {
+                          ...scene.text,
+                          position: 'bottom',
+                          color: '#ffffff',
+                          fontSize: 48,
+                          font: 'Arial',
+                          transform: textTransform,
+                          style: {
+                            bold: true,
+                            italic: false,
+                            underline: false,
+                            align: 'center' as const,
+                          },
+                        },
+                      }
+                    })
+                    
+                    const nextTimeline: TimelineData = {
+                      ...timeline,
+                      scenes: updatedScenes,
+                    }
+                    
+                    setTimeline(nextTimeline)
+                    
+                    // 모든 씬을 다시 로드하여 Transform 적용
+                    setTimeout(() => {
+                      loadAllScenes()
+                    }, 100)
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  크기 조정하기
+                </Button>
+              </div>
+            </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 min-h-0">
